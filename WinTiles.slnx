@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="WinTiles.Core/WinTiles.Core.csproj" />
+  <Project Path="WinTiles.Tests/WinTiles.Tests.csproj" />
+  <Project Path="WinTiles/WinTiles.csproj" />
+</Solution>

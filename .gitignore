@@ -1,0 +1,57 @@
+# ------------------------------
+# Third-party reference source
+# ------------------------------
+# ExplorerPatcher is only a local reference snapshot for reading source.
+ExplorerPatcher-master/
+
+# ------------------------------
+# Build and publish outputs
+# ------------------------------
+artifacts/
+**/bin/
+**/obj/
+TestResults/
+
+# Native helper outputs copied during local builds
+WinTiles/Tools/*.exe
+WinTiles/Tools/*.dll
+WinTiles/Tools/*.pdb
+WinTiles/Tools/*.lib
+WinTiles/Tools/*.exp
+
+# ------------------------------
+# Visual Studio / Rider / VS Code
+# ------------------------------
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+
+# ------------------------------
+# NuGet and package cache files
+# ------------------------------
+packages/
+*.nupkg
+*.snupkg
+
+# ------------------------------
+# Logs, temp files, local experiments
+# ------------------------------
+tmp-*/
+tmp-*.cs
+tmp-*.txt
+*.log
+*.tmp
+*.cache
+
+# ------------------------------
+# OS generated files
+# ------------------------------
+Thumbs.db
+Desktop.ini
+
