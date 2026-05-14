@@ -2,6 +2,7 @@ namespace WinTiles.Core.Models;
 
 public sealed class GeneratedAssetSet
 {
+    // 这里只记录当前资源批次版本，方便后续判断旧磁贴是否需要重新固定。
     public const string CurrentAssetsVersion = "1";
 
     public required string Square70x70LogoPath { get; init; }

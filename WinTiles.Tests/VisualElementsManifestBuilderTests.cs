@@ -15,5 +15,7 @@ public sealed class VisualElementsManifestBuilderTests
         Assert.Contains("Square150x150Logo=\"Assets\\Square150x150Logo.png\"", manifest, StringComparison.Ordinal);
         Assert.Contains("Wide310x150Logo=\"Assets\\Wide310x150Logo.png\"", manifest, StringComparison.Ordinal);
         Assert.Contains("Square310x310Logo=\"Assets\\Square310x310Logo.png\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("ShowNameOnSquare150x150Logo=\"off\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("ShowNameOnWide310x150Logo=\"off\"", manifest, StringComparison.Ordinal);
     }
 }

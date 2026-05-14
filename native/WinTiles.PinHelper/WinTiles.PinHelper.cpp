@@ -593,12 +593,21 @@ static PinResult PinTile(const PinArguments& arguments)
     }
 
     const auto appUserModelId = BuildAppUserModelId(arguments.tileId);
-    auto appIdResult = ExecutePinForShortcutTile(
+
+    // 这里按尺寸分流身份来源：
+    // 1. 2x2 当前已经在用户机器上验证为稳定，继续走 AppUserModelID。
+    // 2. 4x2 在这套 ExplorerPatcher 经典开始菜单环境里会出现 AppID ghost-success：
+    //    Start.TileGrid 里看起来包含了磁贴，但 UI 里并没有真正显示出来。
+    //    之前最强的现场信号是壳层实际识别的身份更接近 HostExe，因此 4x2 单独切回 HostExe。
+    const auto useHostExeIdentity = arguments.size == RequestedSize::Wide4x2;
+    const auto& pinIdentityKind = useHostExeIdentity ? std::wstring(L"HostExe") : std::wstring(L"AppUserModelID");
+    const auto& pinIdentityValue = useHostExeIdentity ? arguments.hostExePath : appUserModelId;
+    auto pinResult = ExecutePinForShortcutTile(
         arguments,
         userPinHelper.Get(),
         win32Factory.Get(),
-        L"AppUserModelID",
-        appUserModelId,
+        pinIdentityKind,
+        pinIdentityValue,
         L"",
         L"");
 
@@ -607,7 +616,7 @@ static PinResult PinTile(const PinArguments& arguments)
         RoUninitialize();
     }
 
-    return appIdResult;
+    return pinResult;
 }
 
 static bool TryParseArguments(int argc, wchar_t** argv, PinArguments& arguments)
