@@ -599,8 +599,8 @@ static PinResult PinTile(const PinArguments& arguments)
         win32Factory.Get(),
         L"AppUserModelID",
         appUserModelId,
-        L"HostExe",
-        arguments.hostExePath);
+        L"",
+        L"");
 
     if (shouldUninitialize)
     {

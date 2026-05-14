@@ -4,7 +4,7 @@ public sealed class GeneratedAssetSet
 {
     public const string CurrentAssetsVersion = "1";
 
-    public required string Square71x71LogoPath { get; init; }
+    public required string Square70x70LogoPath { get; init; }
 
     public required string Square150x150LogoPath { get; init; }
 

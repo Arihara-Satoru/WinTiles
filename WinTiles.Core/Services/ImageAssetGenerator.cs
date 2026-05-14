@@ -18,13 +18,13 @@ public sealed class ImageAssetGenerator
         Directory.CreateDirectory(assetsDirectory);
 
         using var sourceImage = Image.FromFile(sourceImagePath);
-        var square71Path = Path.Combine(assetsDirectory, "Square71x71Logo.png");
+        var square70Path = Path.Combine(assetsDirectory, "Square70x70Logo.png");
         var square150Path = Path.Combine(assetsDirectory, "Square150x150Logo.png");
         var wide310x150Path = Path.Combine(assetsDirectory, "Wide310x150Logo.png");
         var square310Path = Path.Combine(assetsDirectory, "Square310x310Logo.png");
         var shortcutIconPath = Path.Combine(assetsDirectory, "ShortcutIcon.ico");
 
-        SaveResizedImage(sourceImage, square71Path, 71, 71);
+        SaveResizedImage(sourceImage, square70Path, 70, 70);
         SaveResizedImage(sourceImage, square150Path, 150, 150);
         SaveResizedImage(sourceImage, wide310x150Path, 310, 150);
         SaveResizedImage(sourceImage, square310Path, 310, 310);
@@ -32,7 +32,7 @@ public sealed class ImageAssetGenerator
 
         return new GeneratedAssetSet
         {
-            Square71x71LogoPath = square71Path,
+            Square70x70LogoPath = square70Path,
             Square150x150LogoPath = square150Path,
             Wide310x150LogoPath = wide310x150Path,
             Square310x310LogoPath = square310Path,

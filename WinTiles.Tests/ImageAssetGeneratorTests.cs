@@ -23,7 +23,7 @@ public sealed class ImageAssetGeneratorTests : IDisposable
         var generator = new ImageAssetGenerator();
         var generatedAssets = generator.GenerateAssets(sourcePath, Path.Combine(_workingDirectory, "Assets"));
 
-        AssertImageSize(generatedAssets.Square71x71LogoPath, 71, 71);
+        AssertImageSize(generatedAssets.Square70x70LogoPath, 70, 70);
         AssertImageSize(generatedAssets.Square150x150LogoPath, 150, 150);
         AssertImageSize(generatedAssets.Wide310x150LogoPath, 310, 150);
         AssertImageSize(generatedAssets.Square310x310LogoPath, 310, 310);

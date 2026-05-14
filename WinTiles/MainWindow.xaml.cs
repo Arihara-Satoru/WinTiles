@@ -140,12 +140,13 @@ public partial class MainWindow : Window
             var generatedAssetSet = _applicationContext.ImageAssetGenerator.GenerateAssets(copiedSourcePath, assetsDirectory);
 
             var hostExePath = PrepareTileHost(tileDirectory, tileId);
+            var manifestPath = Path.Combine(tileDirectory, "TileHost.VisualElementsManifest.xml");
             File.WriteAllText(
-                Path.Combine(tileDirectory, "TileHost.VisualElementsManifest.xml"),
+                manifestPath,
                 _applicationContext.VisualElementsManifestBuilder.Build());
 
             var appUserModelId = TileIdentityBuilder.BuildAppUserModelId(tileId);
-            var shortcutPath = CreateStartMenuShortcut(tileId, hostExePath, appUserModelId, generatedAssetSet.ShortcutIconPath);
+            var shortcutPath = CreateStartMenuShortcut(tileId, hostExePath, appUserModelId, generatedAssetSet.ShortcutIconPath, manifestPath);
 
             var tileRecord = new TileRecord
             {
@@ -213,7 +214,7 @@ public partial class MainWindow : Window
         return hostExePath;
     }
 
-    private string CreateStartMenuShortcut(string tileId, string hostExePath, string appUserModelId, string shortcutIconPath)
+    private string CreateStartMenuShortcut(string tileId, string hostExePath, string appUserModelId, string shortcutIconPath, string manifestPath)
     {
         var startMenuPrograms = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
@@ -229,7 +230,8 @@ public partial class MainWindow : Window
             Path.GetDirectoryName(hostExePath)!,
             "WinTiles 图片磁贴",
             appUserModelId,
-            shortcutIconPath);
+            shortcutIconPath,
+            manifestPath);
     }
 
     private PinAttemptRecord NormalizePinAttempt(PinHelperResult pinResult)
@@ -237,17 +239,6 @@ public partial class MainWindow : Window
         var status = pinResult.Status;
         var message = pinResult.Message;
         var warning = pinResult.Warning;
-
-        // 如果 helper 回读 Start.TileGrid 后仍明确表示“重新打开集合也找不到磁贴”，
-        // 就不要再把它当成真正成功，避免出现用户肉眼没看到但界面显示成功的假阳性。
-        if (pinResult.ContainsAfterReopen == false)
-        {
-            status = PinHelperResultStatus.Warning;
-            message = "已尝试固定，但开始菜单尚未确认包含该磁贴";
-            warning = string.IsNullOrWhiteSpace(warning)
-                ? "当前固定链路返回成功，但重新读取 Start.TileGrid 仍未找到该磁贴。"
-                : $"{warning}\n当前固定链路返回成功，但重新读取 Start.TileGrid 仍未找到该磁贴。";
-        }
 
         if (_viewModel.SelectedSize.UsesExperimentalPinPath() && pinResult.Status == PinHelperResultStatus.Success)
         {

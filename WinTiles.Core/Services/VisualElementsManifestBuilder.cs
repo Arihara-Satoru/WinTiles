@@ -14,7 +14,8 @@ public sealed class VisualElementsManifestBuilder
         builder.AppendLine("    ForegroundText=\"light\"");
         builder.AppendLine("    ShowNameOnSquare150x150Logo=\"off\"");
         builder.AppendLine("    ShowNameOnWide310x150Logo=\"off\"");
-        builder.AppendLine($"    Square71x71Logo=\"{assetDirectoryName}\\Square71x71Logo.png\"");
+        // Win32 VisualElementsManifest 这条路径走的是桌面磁贴 schema，这里应使用 Square70x70Logo。
+        builder.AppendLine($"    Square70x70Logo=\"{assetDirectoryName}\\Square70x70Logo.png\"");
         builder.AppendLine($"    Square150x150Logo=\"{assetDirectoryName}\\Square150x150Logo.png\"");
         builder.AppendLine($"    Wide310x150Logo=\"{assetDirectoryName}\\Wide310x150Logo.png\"");
         builder.AppendLine($"    Square310x310Logo=\"{assetDirectoryName}\\Square310x310Logo.png\" />");

@@ -21,6 +21,10 @@ public sealed class StartMenuShortcutService
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
         3);
 
+    private static readonly PROPERTYKEY VisualElementsManifestHintPathKey = new(
+        new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
+        31);
+
     public string CreateShortcut(
         string shortcutPath,
         string targetPath,
@@ -28,7 +32,8 @@ public sealed class StartMenuShortcutService
         string workingDirectory,
         string description,
         string appUserModelId,
-        string? iconPath = null)
+        string? iconPath = null,
+        string? visualElementsManifestHintPath = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(shortcutPath)!);
 
@@ -47,6 +52,14 @@ public sealed class StartMenuShortcutService
             SetStringProperty(propertyStore, RelaunchCommandKey, $"\"{targetPath}\" {arguments}");
             SetStringProperty(propertyStore, RelaunchDisplayNameKey, description);
             SetStringProperty(propertyStore, RelaunchIconResourceKey, $"{effectiveIconPath},0");
+
+            // 显式提示壳层去哪里找 Win32 的 VisualElementsManifest，
+            // 这样开始菜单更容易按磁贴资源渲染，而不是退回普通快捷方式图标。
+            if (!string.IsNullOrWhiteSpace(visualElementsManifestHintPath))
+            {
+                SetStringProperty(propertyStore, VisualElementsManifestHintPathKey, visualElementsManifestHintPath);
+            }
+
             propertyStore.Commit();
 
             var persistFile = (IPersistFile)shellLink;
