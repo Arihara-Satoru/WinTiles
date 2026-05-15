@@ -14,6 +14,8 @@ public sealed class WinTilesApplicationContext
 
     public required ClassicStartDetector ClassicStartDetector { get; init; }
 
+    public required CropLayoutCalculator CropLayoutCalculator { get; init; }
+
     public required ImageAssetGenerator ImageAssetGenerator { get; init; }
 
     public required VisualElementsManifestBuilder VisualElementsManifestBuilder { get; init; }

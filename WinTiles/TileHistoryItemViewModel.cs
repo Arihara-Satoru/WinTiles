@@ -13,7 +13,7 @@ public sealed class TileHistoryItemViewModel
 
     public required bool HasThumbnailImage { get; init; }
 
-    public required string RequestedSizeText { get; init; }
+    public required string GridPositionText { get; init; }
 
     public required string AttemptedAtText { get; init; }
 

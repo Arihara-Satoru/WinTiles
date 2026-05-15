@@ -70,6 +70,7 @@ public partial class App : Application
             TileHostTemplatePath = Path.Combine(toolsRoot, "TileHost.exe"),
             TileRecordStore = new TileRecordStore(dataRoot),
             ClassicStartDetector = new ClassicStartDetector(),
+            CropLayoutCalculator = new CropLayoutCalculator(),
             ImageAssetGenerator = new ImageAssetGenerator(),
             VisualElementsManifestBuilder = new VisualElementsManifestBuilder(),
             TileHostConfigurationWriter = new TileHostConfigurationWriter(),
