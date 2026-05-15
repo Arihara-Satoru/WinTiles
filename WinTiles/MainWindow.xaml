@@ -5,135 +5,746 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="WinTiles"
-        Width="1080"
-        Height="700"
+        Width="1512"
+        Height="1018"
+        MinWidth="1280"
+        MinHeight="860"
         Background="{StaticResource WindowBackgroundBrush}"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="22">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280" />
-            <ColumnDefinition Width="20" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <Grid SnapsToDevicePixels="True">
+        <Ellipse Width="720"
+                 Height="720"
+                 HorizontalAlignment="Left"
+                 VerticalAlignment="Top"
+                 Margin="-250,-260,0,0"
+                 Fill="#CDE0FF"
+                 Opacity="0.42" />
+        <Ellipse Width="820"
+                 Height="820"
+                 HorizontalAlignment="Right"
+                 VerticalAlignment="Bottom"
+                 Margin="0,0,-300,-280"
+                 Fill="#E3EEFF"
+                 Opacity="0.60" />
 
-        <Border Grid.Column="0"
-                Background="{StaticResource PanelBackgroundBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="18"
-                Padding="22">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+        <Grid Margin="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="430" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock FontSize="30"
-                               FontWeight="SemiBold"
-                               Foreground="#12304F"
-                               Text="WinTiles" />
-                    <TextBlock Margin="0,8,0,0"
-                               Foreground="{StaticResource MutedTextBrush}"
-                               Text="把图片固定到 ExplorerPatcher 经典开始菜单"
-                               TextWrapping="Wrap" />
-                </StackPanel>
+            <Border Grid.Column="0"
+                    Style="{StaticResource ShellCardStyle}"
+                    Padding="28">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="2"
-                            VerticalAlignment="Center">
-                    <Button x:Name="SelectImageButton"
-                            Click="SelectImageButton_Click"
-                            Content="选择图片" />
-                    <Button x:Name="PinImageButton"
-                            Click="PinImageButton_Click"
-                            Content="固定图片" />
-                    <Button x:Name="ClearPinButton"
-                            Click="ClearPinButton_Click"
-                            Content="清除全部固定" />
-                </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="90"
+                                Height="90"
+                                CornerRadius="26">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#5CA5FF" Offset="0" />
+                                    <GradientStop Color="#2A6FF3" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <UniformGrid Margin="20"
+                                             Rows="2"
+                                             Columns="2">
+                                    <Border Margin="0,0,6,6"
+                                            Background="#EAF3FF"
+                                            CornerRadius="6" />
+                                    <Border Margin="6,0,0,6"
+                                            Background="#EAF3FF"
+                                            CornerRadius="6" />
+                                    <Border Margin="0,6,6,0"
+                                            Background="#EAF3FF"
+                                            CornerRadius="6" />
+                                    <Border Margin="6,6,0,0"
+                                            Background="#EAF3FF"
+                                            CornerRadius="6" />
+                                </UniformGrid>
+                                <Canvas HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        Width="34"
+                                        Height="34"
+                                        Margin="0,0,2,2">
+                                    <Ellipse Canvas.Left="18"
+                                             Canvas.Top="1"
+                                             Width="8"
+                                             Height="8"
+                                             Fill="#EAF3FF" />
+                                    <Rectangle Canvas.Left="20"
+                                               Canvas.Top="6"
+                                               Width="3"
+                                               Height="13"
+                                               Fill="#EAF3FF"
+                                               RenderTransformOrigin="0.5,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <RotateTransform Angle="35" CenterX="1.5" CenterY="6.5" />
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                    <Rectangle Canvas.Left="14"
+                                               Canvas.Top="14"
+                                               Width="3"
+                                               Height="8"
+                                               Fill="#EAF3FF"
+                                               RenderTransformOrigin="0.5,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <RotateTransform Angle="35" CenterX="1.5" CenterY="4" />
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Canvas>
+                            </Grid>
+                        </Border>
 
-                <TextBlock Grid.Row="3"
-                           Text="{Binding AvailabilityMessage}"
-                           Foreground="{Binding AvailabilityBrush}"
-                           TextWrapping="Wrap" />
-            </Grid>
-        </Border>
+                        <StackPanel Margin="18,6,0,0">
+                            <TextBlock FontSize="40"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                       Text="WinTiles" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Width="272"
+                                       FontSize="16"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="把喜欢的图片固定成开始菜单磁贴，也可以回看固定历史并删除单条记录。"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
 
-        <Border Grid.Column="2"
-                Background="{StaticResource PanelBackgroundBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="18"
-                Padding="24">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="1"
+                                Margin="0,28,0,8">
+                        <Button x:Name="SelectImageButton"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                Click="SelectImageButton_Click">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+                                <Border Width="32"
+                                        Height="32"
+                                        Margin="0,0,12,0"
+                                        Background="#FFFFFF26"
+                                        BorderBrush="#FFFFFF66"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <Viewbox Margin="6">
+                                        <Canvas Width="24"
+                                                Height="24">
+                                            <Rectangle Width="19"
+                                                       Height="14"
+                                                       Canvas.Left="2.5"
+                                                       Canvas.Top="4.5"
+                                                       RadiusX="2.8"
+                                                       RadiusY="2.8"
+                                                       Stroke="#FFFFFFFF"
+                                                       StrokeThickness="1.5"
+                                                       Fill="Transparent" />
+                                            <Ellipse Width="3"
+                                                     Height="3"
+                                                     Canvas.Left="6"
+                                                     Canvas.Top="7"
+                                                     Fill="#FFFFFFFF" />
+                                            <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
+                                                      Stroke="#FFFFFFFF"
+                                                      StrokeThickness="1.8"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"
+                                                      StrokeLineJoin="Round" />
+                                        </Canvas>
+                                    </Viewbox>
+                                </Border>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="选择图片" />
+                            </StackPanel>
+                        </Button>
 
-                <StackPanel>
-                    <TextBlock FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="#12304F"
-                               Text="预览区" />
-                    <TextBlock Margin="0,6,0,0"
-                               Foreground="{StaticResource MutedTextBrush}"
-                               Text="{Binding PreviewTitle}" />
-                </StackPanel>
+                        <Button x:Name="PinImageButton"
+                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                Click="PinImageButton_Click">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+                                <Border Width="30"
+                                        Height="30"
+                                        Margin="0,0,12,0"
+                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                        BorderBrush="#D4E4FF"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <Viewbox Margin="5">
+                                        <Canvas Width="24"
+                                                Height="24">
+                                            <Ellipse Width="7"
+                                                     Height="7"
+                                                     Canvas.Left="8.5"
+                                                     Canvas.Top="1.5"
+                                                     Fill="{StaticResource PrimaryAccentBrush}" />
+                                            <Rectangle Width="3"
+                                                       Height="13"
+                                                       Canvas.Left="10.5"
+                                                       Canvas.Top="6"
+                                                       Fill="{StaticResource PrimaryAccentBrush}"
+                                                       RenderTransformOrigin="0.5,0.5">
+                                                <Rectangle.RenderTransform>
+                                                    <RotateTransform Angle="35" CenterX="1.5" CenterY="6.5" />
+                                                </Rectangle.RenderTransform>
+                                            </Rectangle>
+                                            <Rectangle Width="2.5"
+                                                       Height="8"
+                                                       Canvas.Left="5.5"
+                                                       Canvas.Top="13"
+                                                       Fill="{StaticResource PrimaryAccentBrush}"
+                                                       RenderTransformOrigin="0.5,0.5">
+                                                <Rectangle.RenderTransform>
+                                                    <RotateTransform Angle="35" CenterX="1.25" CenterY="4" />
+                                                </Rectangle.RenderTransform>
+                                            </Rectangle>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Border>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="固定图片" />
+                            </StackPanel>
+                        </Button>
 
-                <StackPanel Grid.Row="1"
-                            Margin="0,22,0,18"
-                            Orientation="Horizontal">
-                    <RadioButton x:Name="Size2x2RadioButton"
-                                 Margin="0,0,18,0"
-                                 GroupName="TileSizeGroup"
-                                 Checked="SizeRadioButton_Checked"
-                                 Content="2x2"
-                                 IsChecked="True" />
-                    <RadioButton x:Name="Size4x2RadioButton"
-                                 GroupName="TileSizeGroup"
-                                 Checked="SizeRadioButton_Checked"
-                                 Content="4x2" />
-                </StackPanel>
+                        <Button x:Name="ClearPinButton"
+                                Style="{StaticResource DangerActionButtonStyle}"
+                                Click="ClearPinButton_Click">
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center">
+                                <Border Width="30"
+                                        Height="30"
+                                        Margin="0,0,12,0"
+                                        Background="#FFFFFF"
+                                        BorderBrush="#F3CAD3"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="18"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource DangerBrush}"
+                                               Text="×" />
+                                </Border>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="清除全部固定" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
 
-                <Border Grid.Row="2"
-                        Background="#F8FBFF"
-                        BorderBrush="#D9E7F7"
-                        BorderThickness="1"
-                        CornerRadius="18"
-                        Padding="18">
+                    <Border Grid.Row="2"
+                            Margin="0,14,0,22"
+                            Height="1"
+                            Background="#E3EAF3" />
+
+                    <StackPanel Grid.Row="3"
+                                Margin="0,0,0,18">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="10"
+                                         Height="10"
+                                         Margin="0,7,10,0"
+                                         Fill="{StaticResource PrimaryAccentBrush}" />
+                                <TextBlock FontSize="17"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                           Text="固定历史" />
+                            </StackPanel>
+
+                            <Border Grid.Column="1"
+                                    Margin="12,0,0,0"
+                                    Padding="12,6"
+                                    Background="{StaticResource PrimaryAccentSoftBrush}"
+                                    BorderBrush="#D6E4FB"
+                                    BorderThickness="1"
+                                    CornerRadius="999">
+                                <TextBlock FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryAccentBrush}"
+                                           Text="{Binding HistoryCountText}" />
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Margin="0,0,0,14"
+                                   FontSize="13"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="点击条目后，右侧会显示对应图片；选中历史后可以直接删除这一条。"
+                                   TextWrapping="Wrap" />
+
+                        <Border Style="{StaticResource InsetCardStyle}"
+                                Padding="12"
+                                ClipToBounds="True">
+                            <Grid>
+                                <ListBox x:Name="HistoryListBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         MaxHeight="420"
+                                         MinHeight="240"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         SelectionChanged="HistoryListBox_SelectionChanged"
+                                         Visibility="{Binding HasHistoryItems, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Margin" Value="0,0,0,12" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="1" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <Border x:Name="Root"
+                                                                Background="{TemplateBinding Background}"
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                CornerRadius="22">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter TargetName="Root" Property="Background" Value="#ECF4FF" />
+                                                                <Setter TargetName="Root" Property="BorderBrush" Value="#B8D0FA" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Root" Property="Background" Value="#F7FAFF" />
+                                                                <Setter TargetName="Root" Property="BorderBrush" Value="#D8E5F5" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="14,13">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="82" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="14" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Width="82"
+                                                        Height="82"
+                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                        BorderBrush="#D5E3FB"
+                                                        BorderThickness="1"
+                                                        CornerRadius="20"
+                                                        ClipToBounds="True">
+                                                    <Grid>
+                                                        <Image Source="{Binding ThumbnailImage}"
+                                                               Stretch="UniformToFill"
+                                                               Visibility="Visible">
+                                                            <Image.Style>
+                                                                <Style TargetType="Image">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Image.Style>
+                                                        </Image>
+
+                                                        <StackPanel HorizontalAlignment="Center"
+                                                                    VerticalAlignment="Center">
+                                                            <StackPanel.Style>
+                                                                <Style TargetType="StackPanel">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </StackPanel.Style>
+                                                            <Border Width="38"
+                                                                    Height="38"
+                                                                    Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                                    BorderBrush="#D5E3FB"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="14">
+                                                                <TextBlock HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="16"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource PrimaryAccentBrush}"
+                                                                           Text="无图" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="2"
+                                                            VerticalAlignment="Center">
+                                                    <TextBlock FontSize="16"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                                               Text="{Binding DisplayTitle}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               FontSize="13"
+                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                               Text="{Binding AttemptedAtText}" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               FontSize="13"
+                                                               Foreground="{Binding DetailBrush}"
+                                                               Text="{Binding DetailText}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <Border Grid.Column="4"
+                                                        Padding="12,8"
+                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                        BorderBrush="#D6E4FB"
+                                                        BorderThickness="1"
+                                                        CornerRadius="999"
+                                                        VerticalAlignment="Center">
+                                                    <TextBlock FontSize="13"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource PrimaryAccentBrush}"
+                                                               Text="{Binding RequestedSizeText}" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <StackPanel HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasHistoryItems}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Border Width="88"
+                                            Height="88"
+                                            HorizontalAlignment="Center"
+                                            Background="{StaticResource PrimaryAccentSoftBrush}"
+                                            BorderBrush="#D5E3FB"
+                                            BorderThickness="1"
+                                            CornerRadius="24">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="26"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                   Text="历史" />
+                                    </Border>
+                                    <TextBlock Margin="0,16,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                               Text="尚未固定历史" />
+                                    <TextBlock Margin="0,10,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="14"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="先选择图片并固定，历史会自动出现在这里。"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4"
+                                Margin="0,0,0,18">
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,0,0,12">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Margin="0,7,10,0"
+                                     Fill="{StaticResource PrimaryAccentBrush}" />
+                            <TextBlock FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                       Text="本地记录" />
+                        </StackPanel>
+
+                        <Border Style="{StaticResource InsetCardStyle}"
+                                Padding="18">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Width="46"
+                                        Height="46"
+                                        Background="#EAF2FF"
+                                        BorderBrush="#D5E3FB"
+                                        BorderThickness="1"
+                                        CornerRadius="14">
+                                    <Viewbox Margin="10">
+                                        <Canvas Width="24"
+                                                Height="24">
+                                            <Path Data="M3,7 H9 L11,9 H21 V19 H3 Z"
+                                                  Fill="Transparent"
+                                                  Stroke="{StaticResource PrimaryAccentBrush}"
+                                                  StrokeThickness="1.6"
+                                                  StrokeLineJoin="Round" />
+                                            <Path Data="M3,9 H21"
+                                                  Stroke="{StaticResource PrimaryAccentBrush}"
+                                                  StrokeThickness="1.6"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Canvas>
+                                    </Viewbox>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="14,0,14,0"
+                                            VerticalAlignment="Center">
+                                    <TextBlock FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                               Text="记录目录" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="{Binding RecordLocationText}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <Button Grid.Column="2"
+                                        Width="48"
+                                        Height="48"
+                                        Margin="0"
+                                        Padding="0"
+                                        Style="{StaticResource IconButtonStyle}"
+                                        Click="OpenRecordFolderButton_Click">
+                                    <Viewbox Width="20"
+                                             Height="20">
+                                        <Canvas Width="24"
+                                                Height="24">
+                                            <Path Data="M3,7 H9 L11,9 H21 V19 H3 Z"
+                                                  Fill="#FFFFFF"
+                                                  Stroke="{StaticResource PrimaryAccentBrush}"
+                                                  StrokeThickness="1.6"
+                                                  StrokeLineJoin="Round" />
+                                            <Path Data="M3,9 H21"
+                                                  Stroke="{StaticResource PrimaryAccentBrush}"
+                                                  StrokeThickness="1.6"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <Border Grid.Row="6"
+                            Padding="14,12"
+                            Background="{StaticResource InfoSoftBrush}"
+                            BorderBrush="{StaticResource InfoBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="18">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10"
+                                     Height="10"
+                                     Margin="0,7,10,0"
+                                     Fill="{Binding AvailabilityBrush}" />
+                            <TextBlock Text="{Binding AvailabilityMessage}"
+                                       Foreground="{Binding AvailabilityBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Style="{StaticResource ShellCardStyle}"
+                    Padding="28">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
                     <Grid>
-                        <Image Source="{Binding PreviewImage}"
-                               Stretch="Uniform" />
-                        <TextBlock HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   FontSize="18"
-                                   Text="请选择一张图片进行预览">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasPreviewImage}" Value="True">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </Border>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Row="3"
-                           Margin="0,18,0,0"
-                           Text="{Binding StatusText}"
-                           Foreground="{Binding StatusBrush}"
-                           TextWrapping="Wrap" />
-            </Grid>
-        </Border>
+                        <StackPanel>
+                            <TextBlock FontSize="26"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                       Text="预览区" />
+                            <TextBlock Margin="0,10,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="选择图片后可先预览；点击左侧历史条目时，这里会切换到对应固定。"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Border Grid.Column="1"
+                                Margin="18,2,0,0"
+                                Padding="12,8"
+                                Background="{StaticResource PrimaryAccentSoftBrush}"
+                                BorderBrush="#D6E4FB"
+                                BorderThickness="1"
+                                CornerRadius="999">
+                            <TextBlock FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource PrimaryAccentBrush}"
+                                       Text="{Binding SelectedHistoryBadgeText}" />
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Margin="0,24,0,0"
+                            Style="{StaticResource InsetCardStyle}"
+                            Padding="20"
+                            ClipToBounds="True">
+                        <Grid>
+                            <Border CornerRadius="28"
+                                    Background="#EEF5FD"
+                                    BorderBrush="#D5E1F0"
+                                    BorderThickness="1"
+                                    ClipToBounds="True">
+                                <Grid>
+                                    <Image Source="{Binding PreviewImage}"
+                                           Stretch="Uniform"
+                                           HorizontalAlignment="Stretch"
+                                           VerticalAlignment="Stretch" />
+
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasPreviewImage}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <Border Width="88"
+                                                Height="88"
+                                                HorizontalAlignment="Center"
+                                                Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                BorderBrush="#D5E3FB"
+                                                BorderThickness="1"
+                                                CornerRadius="24">
+                                            <Viewbox Margin="20">
+                                                <Canvas Width="24"
+                                                        Height="24">
+                                                    <Rectangle Width="19"
+                                                               Height="14"
+                                                               Canvas.Left="2.5"
+                                                               Canvas.Top="4.5"
+                                                               RadiusX="2.8"
+                                                               RadiusY="2.8"
+                                                               Stroke="{StaticResource PrimaryAccentBrush}"
+                                                               StrokeThickness="1.5"
+                                                               Fill="Transparent" />
+                                                    <Ellipse Width="3"
+                                                             Height="3"
+                                                             Canvas.Left="6"
+                                                             Canvas.Top="7"
+                                                             Fill="{StaticResource PrimaryAccentBrush}" />
+                                                    <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
+                                                              Stroke="{StaticResource PrimaryAccentBrush}"
+                                                              StrokeThickness="1.8"
+                                                              StrokeStartLineCap="Round"
+                                                              StrokeEndLineCap="Round"
+                                                              StrokeLineJoin="Round" />
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <TextBlock Margin="0,18,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="22"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="{Binding PreviewTitle}"
+                                                   TextWrapping="Wrap"
+                                                   TextAlignment="Center" />
+                                        <TextBlock Margin="0,10,0,0"
+                                                   HorizontalAlignment="Center"
+                                                   FontSize="15"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="点击左侧历史条目，或先选择图片开始预览"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2"
+                            Margin="0,20,0,0"
+                            Padding="18"
+                            Background="{StaticResource InsetSurfaceBrush}"
+                            BorderBrush="{StaticResource InsetBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="24">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{Binding StatusBrush}"
+                                           Text="{Binding StatusText}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,8,0,0"
+                                           FontSize="13"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="删除会同时移除开始菜单磁贴和本地记录。"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button x:Name="DeleteSelectedHistoryButton"
+                                    Grid.Column="1"
+                                    Width="180"
+                                    Style="{StaticResource DangerActionButtonStyle}"
+                                    Click="DeleteSelectedHistoryButton_Click"
+                                    IsEnabled="{Binding CanDeleteSelectedHistory}">
+                                <TextBlock VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="删除选中历史" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

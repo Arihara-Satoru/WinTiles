@@ -4,9 +4,6 @@ public static class TileIdentityBuilder
 {
     public static string BuildAppUserModelId(string tileId) => $"WinTiles.Image.{tileId}";
 
-    public static string BuildResolvedIdentity(string tileId, string hostExePath) =>
-        $"AppUserModelID={BuildAppUserModelId(tileId)};HostExe={hostExePath}";
-
     public static string BuildShortcutDisplayTitle(string sourceImagePath)
     {
         var baseName = Path.GetFileNameWithoutExtension(sourceImagePath);

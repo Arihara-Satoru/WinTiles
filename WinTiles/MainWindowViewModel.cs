@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
@@ -8,17 +9,24 @@ namespace WinTiles;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
-    private string _previewTitle = "尚未选择图片";
+    private string _previewTitle = "尚未选择图片或历史固定";
     private BitmapImage? _previewImage;
     private bool _hasPreviewImage;
-    private string _statusText = "请选择一张图片，然后固定，或者一键清除当前软件固定的磁贴。";
+    private string _statusText = "请选择一张图片，或从固定历史中点开一条记录。";
     private Brush _statusBrush = Brushes.DarkSlateBlue;
     private string _availabilityMessage = "正在检查经典开始菜单状态…";
     private Brush _availabilityBrush = Brushes.DarkSlateBlue;
+    private string _recordLocationText = "本地记录目录";
+    private string _selectedHistoryBadgeText = "历史预览";
+    private string _historyCountText = "0 条";
     private TileRequestSize _selectedSize = TileRequestSize.Medium2x2;
     private bool _isClassicStartAvailable;
     private bool _areToolsAvailable;
     private bool _isBusy;
+    private bool _hasHistoryItems;
+    private bool _canDeleteSelectedHistory;
+
+    public ObservableCollection<TileHistoryItemViewModel> HistoryItems { get; } = new();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -64,6 +72,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set => SetField(ref _availabilityBrush, value);
     }
 
+    public string RecordLocationText
+    {
+        get => _recordLocationText;
+        set => SetField(ref _recordLocationText, value);
+    }
+
+    public string SelectedHistoryBadgeText
+    {
+        get => _selectedHistoryBadgeText;
+        set => SetField(ref _selectedHistoryBadgeText, value);
+    }
+
+    public string HistoryCountText
+    {
+        get => _historyCountText;
+        set => SetField(ref _historyCountText, value);
+    }
+
     public TileRequestSize SelectedSize
     {
         get => _selectedSize;
@@ -86,6 +112,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         get => _isBusy;
         set => SetField(ref _isBusy, value);
+    }
+
+    public bool HasHistoryItems
+    {
+        get => _hasHistoryItems;
+        set => SetField(ref _hasHistoryItems, value);
+    }
+
+    public bool CanDeleteSelectedHistory
+    {
+        get => _canDeleteSelectedHistory;
+        set => SetField(ref _canDeleteSelectedHistory, value);
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

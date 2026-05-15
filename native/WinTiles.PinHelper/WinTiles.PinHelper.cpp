@@ -651,9 +651,6 @@ static PinResult PinTile(const PinArguments& arguments)
     }
 
     const auto appUserModelId = BuildAppUserModelId(arguments.tileId);
-
-    // 两种尺寸都统一用 AppUserModelID，避免 4x2 继续借 HostExe 走偏可见名称和图标。
-    // host exe 参数暂时保留兼容性，但不再参与当前固定身份选择。
     const std::wstring pinIdentityKind = L"AppUserModelID";
     const std::wstring pinIdentityValue = appUserModelId;
     auto pinResult = ExecutePinForShortcutTile(
@@ -717,24 +714,6 @@ static PinResult UnpinTile(const PinArguments& arguments)
         return CreateFailureResult(L"切换到 Win32 tile factory 失败：" + FormatHResult(hr), L"ActivationFactory.Win32Factory");
     }
 
-    const auto appUserModelId = BuildAppUserModelId(arguments.tileId);
-    const std::wstring identityKind = L"AppUserModelID";
-    const std::wstring identityValue = appUserModelId;
-
-    // 清除流程先确认目标是否还在 Start.TileGrid 里：
-    // 如果它早就被手动移走了，也返回 warning，让前端继续清本地残留即可。
-    ComPtr<IUnifiedTileIdentifier> unifiedTileIdentifier;
-    hr = CreateUnifiedTileIdentifier(win32Factory.Get(), identityValue, &unifiedTileIdentifier);
-    if (FAILED(hr))
-    {
-        if (shouldUninitialize)
-        {
-            RoUninitialize();
-        }
-
-        return CreateFailureResult(L"创建 Win32 tile 标识失败：" + FormatHResult(hr), L"Win32UnifiedTileIdentifierFactory.Create");
-    }
-
     ComPtr<ICuratedTileCollection> tileCollection;
     ComPtr<IStartTileCollection> startTileCollection;
     hr = OpenStartTileCollection(&tileCollection, &startTileCollection);
@@ -749,11 +728,26 @@ static PinResult UnpinTile(const PinArguments& arguments)
     }
 
     PinResult result;
-    result.identityKind = identityKind;
-    result.identityValue = identityValue;
+    const auto appUserModelId = BuildAppUserModelId(arguments.tileId);
 
+    result.identityKind = L"AppUserModelID";
+    result.identityValue = appUserModelId;
+
+    ComPtr<IUnifiedTileIdentifier> unifiedTileIdentifier;
     bool contains = false;
     bool containsKnown = false;
+
+    hr = CreateUnifiedTileIdentifier(win32Factory.Get(), appUserModelId, &unifiedTileIdentifier);
+    if (FAILED(hr))
+    {
+        if (shouldUninitialize)
+        {
+            RoUninitialize();
+        }
+
+        return CreateFailureResult(L"创建 Win32 tile 标识失败：" + FormatHResult(hr), L"Win32UnifiedTileIdentifierFactory.Create");
+    }
+
     if (SUCCEEDED(CheckContains(tileCollection.Get(), unifiedTileIdentifier.Get(), &contains)))
     {
         containsKnown = true;
@@ -788,8 +782,8 @@ static PinResult UnpinTile(const PinArguments& arguments)
         }
 
         auto failure = CreateFailureResult(L"调用清除接口失败：" + FormatHResult(hr), L"UnpinFromStart");
-        failure.identityKind = identityKind;
-        failure.identityValue = identityValue;
+        failure.identityKind = result.identityKind;
+        failure.identityValue = result.identityValue;
         failure.containsBefore = result.containsBefore;
         return failure;
     }
@@ -806,8 +800,8 @@ static PinResult UnpinTile(const PinArguments& arguments)
         }
 
         auto failure = CreateFailureResult(L"提交 Start.TileGrid 失败：" + FormatHResult(hr), L"UnpinFromStart");
-        failure.identityKind = identityKind;
-        failure.identityValue = identityValue;
+        failure.identityKind = result.identityKind;
+        failure.identityValue = result.identityValue;
         failure.containsBefore = result.containsBefore;
         return failure;
     }

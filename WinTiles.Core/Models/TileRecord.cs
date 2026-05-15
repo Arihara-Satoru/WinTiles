@@ -8,8 +8,6 @@ public sealed class TileRecord
 
     public required TileRequestSize RequestedSize { get; init; }
 
-    public required string ResolvedIdentity { get; init; }
-
     public required string HostExePath { get; init; }
 
     public required string ShortcutPath { get; init; }
