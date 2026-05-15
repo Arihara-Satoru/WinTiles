@@ -25,6 +25,25 @@ public sealed class StartMenuShortcutServiceTests : IDisposable
         Assert.Equal("WinTiles.Image.test", service.TryReadAppUserModelId(shortcutPath));
     }
 
+    [Fact]
+    public void CreateShortcut_writes_title()
+    {
+        Directory.CreateDirectory(_workingDirectory);
+        var shortcutPath = Path.Combine(_workingDirectory, "sample.lnk");
+        var service = new StartMenuShortcutService();
+
+        service.CreateShortcut(
+            shortcutPath,
+            Path.Combine(Environment.SystemDirectory, "notepad.exe"),
+            string.Empty,
+            Environment.SystemDirectory,
+            "WinTiles 测试快捷方式",
+            "WinTiles.Image.test");
+
+        Assert.True(File.Exists(shortcutPath));
+        Assert.Equal("WinTiles 测试快捷方式", service.TryReadTitle(shortcutPath));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))

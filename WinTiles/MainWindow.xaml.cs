@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     {
         RefreshEnvironmentState();
         ApplySelectedSize(TileRequestSize.Medium2x2);
-        RefreshPinButtonState();
+        RefreshActionButtonsState();
 
         if (!string.IsNullOrWhiteSpace(startupTileId))
         {
@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         if (tileRecord is null)
         {
             SetStatus("已打开 WinTiles，但没有找到对应的磁贴记录。", Brushes.DarkGoldenrod);
+            RefreshActionButtonsState();
             return;
         }
 
@@ -64,6 +65,8 @@ public partial class MainWindow : Window
         {
             SetStatus(pinAttempt.Message, MapStatusBrush(pinAttempt.Status));
         }
+
+        RefreshActionButtonsState();
     }
 
     private void SelectImageButton_Click(object sender, RoutedEventArgs e)
@@ -83,12 +86,17 @@ public partial class MainWindow : Window
         LoadPreviewImage(openFileDialog.FileName);
         _viewModel.PreviewTitle = Path.GetFileName(openFileDialog.FileName);
         SetStatus($"已选择图片：{Path.GetFileName(openFileDialog.FileName)}", Brushes.DarkSlateBlue);
-        RefreshPinButtonState();
+        RefreshActionButtonsState();
     }
 
     private async void PinImageButton_Click(object sender, RoutedEventArgs e)
     {
         await PinCurrentImageAsync().ConfigureAwait(true);
+    }
+
+    private async void ClearPinButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ClearAllPinnedTilesAsync().ConfigureAwait(true);
     }
 
     private void SizeRadioButton_Checked(object sender, RoutedEventArgs e)
@@ -126,7 +134,7 @@ public partial class MainWindow : Window
         try
         {
             _viewModel.IsBusy = true;
-            RefreshPinButtonState();
+            RefreshActionButtonsState();
 
             var tileId = Guid.NewGuid().ToString("N");
             var tileDirectory = _applicationContext.TileRecordStore.CreateTileDirectory(tileId);
@@ -144,7 +152,14 @@ public partial class MainWindow : Window
                 _applicationContext.VisualElementsManifestBuilder.Build());
 
             var appUserModelId = TileIdentityBuilder.BuildAppUserModelId(tileId);
-            var shortcutPath = CreateStartMenuShortcut(tileId, hostExePath, appUserModelId, generatedAssetSet.ShortcutIconPath, manifestPath);
+            var shortcutDisplayTitle = TileIdentityBuilder.BuildShortcutDisplayTitle(_selectedImagePath!);
+            var shortcutPath = CreateStartMenuShortcut(
+                tileId,
+                hostExePath,
+                appUserModelId,
+                generatedAssetSet.ShortcutIconPath,
+                manifestPath,
+                shortcutDisplayTitle);
 
             var tileRecord = new TileRecord
             {
@@ -159,21 +174,17 @@ public partial class MainWindow : Window
 
             await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
 
-            // 先直接触发一次系统自己的“固定到开始屏幕”命令，尽量贴近用户手动右键固定的行为。
+            // 先保留系统入口作为兼容探测，真正的自动固定统一交给 helper，避免 2x2 只弹侧栏不落地。
             var shellPinResult = await _applicationContext.StartMenuPinVerbInvoker.TryPinAsync(
                 appUserModelId,
                 shortcutPath).ConfigureAwait(true);
 
-            PinHelperResult? pinResult = null;
-            if (_viewModel.SelectedSize == TileRequestSize.Wide4x2 || !shellPinResult.Invoked)
-            {
-                // 4x2 仍需要内部接口补一次尺寸请求；如果系统固定命令没触发，也继续保留 helper 作为兜底。
-                pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
-                    _applicationContext.PinHelperPath,
-                    tileId,
-                    _viewModel.SelectedSize,
-                    hostExePath).ConfigureAwait(true);
-            }
+            // helper 才是负责真正写入 Start.TileGrid 的路径，2x2 和 4x2 都统一走这里。
+            var pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
+                _applicationContext.PinHelperPath,
+                tileId,
+                _viewModel.SelectedSize,
+                hostExePath).ConfigureAwait(true);
 
             var normalizedAttempt = NormalizePinAttempt(shellPinResult, pinResult, appUserModelId);
             await _applicationContext.TileRecordStore.SavePinAttemptAsync(tileId, normalizedAttempt).ConfigureAwait(true);
@@ -201,7 +212,115 @@ public partial class MainWindow : Window
         finally
         {
             _viewModel.IsBusy = false;
-            RefreshPinButtonState();
+            RefreshActionButtonsState();
+        }
+    }
+
+    private async Task ClearAllPinnedTilesAsync()
+    {
+        RefreshEnvironmentState();
+        if (!_viewModel.IsClassicStartAvailable || !_viewModel.AreToolsAvailable)
+        {
+            MessageBox.Show(this, _viewModel.AvailabilityMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            _viewModel.IsBusy = true;
+            RefreshActionButtonsState();
+
+            var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
+            if (tileRecords.Count == 0)
+            {
+                const string emptyMessage = "当前没有通过 WinTiles 固定的磁贴。";
+                SetStatus(emptyMessage, Brushes.DarkGoldenrod);
+                MessageBox.Show(this, emptyMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var clearedCount = 0;
+            var warningMessages = new List<string>();
+            var failureMessages = new List<string>();
+
+            foreach (var tileRecord in tileRecords)
+            {
+                var unpinResult = await _applicationContext.PinHelperInvoker.UnpinImageAsync(
+                    _applicationContext.PinHelperPath,
+                    tileRecord.TileId).ConfigureAwait(true);
+
+                if (unpinResult.Status == PinHelperResultStatus.Failure)
+                {
+                    failureMessages.Add(FormatTileMessage(tileRecord, unpinResult.Message));
+                    continue;
+                }
+
+                var tileMessages = new List<string>();
+                try
+                {
+                    DeleteFileIfExists(tileRecord.ShortcutPath);
+                }
+                catch (Exception cleanupException)
+                {
+                    tileMessages.Add($"删除快捷方式失败：{cleanupException.Message}");
+                }
+
+                try
+                {
+                    _applicationContext.TileRecordStore.DeleteTileDirectory(tileRecord.TileId);
+                }
+                catch (Exception cleanupException)
+                {
+                    tileMessages.Add($"删除本地记录失败：{cleanupException.Message}");
+                }
+
+                clearedCount++;
+
+                var helperMessage = CombineWarnings(unpinResult.Message, unpinResult.Warning);
+                if (!string.IsNullOrWhiteSpace(helperMessage) && unpinResult.Status == PinHelperResultStatus.Warning)
+                {
+                    warningMessages.Add(FormatTileMessage(tileRecord, helperMessage));
+                }
+
+                var cleanupMessage = CombineWarnings(tileMessages.ToArray());
+                if (!string.IsNullOrWhiteSpace(cleanupMessage))
+                {
+                    warningMessages.Add(FormatTileMessage(tileRecord, cleanupMessage));
+                }
+            }
+
+            if (clearedCount == 0)
+            {
+                var failureMessage = CombineWarnings(failureMessages.ToArray()) ?? "未能清除任何磁贴。";
+                SetStatus("清除固定失败，请查看弹窗提示。", Brushes.Firebrick);
+                MessageBox.Show(this, failureMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var successMessage = clearedCount == 1
+                ? "已清除 1 个通过 WinTiles 固定的磁贴。"
+                : $"已清除 {clearedCount} 个通过 WinTiles 固定的磁贴。";
+
+            var combinedWarnings = CombineWarnings(warningMessages.Concat(failureMessages).ToArray());
+            if (!string.IsNullOrWhiteSpace(combinedWarnings))
+            {
+                SetStatus(successMessage, Brushes.DarkGoldenrod);
+                MessageBox.Show(this, $"{successMessage}\n\n{combinedWarnings}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                SetStatus(successMessage, Brushes.SeaGreen);
+            }
+        }
+        catch (Exception exception)
+        {
+            SetStatus("清除固定失败，请查看弹窗提示。", Brushes.Firebrick);
+            MessageBox.Show(this, exception.Message, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _viewModel.IsBusy = false;
+            RefreshActionButtonsState();
         }
     }
 
@@ -220,7 +339,13 @@ public partial class MainWindow : Window
         return hostExePath;
     }
 
-    private string CreateStartMenuShortcut(string tileId, string hostExePath, string appUserModelId, string shortcutIconPath, string manifestPath)
+    private string CreateStartMenuShortcut(
+        string tileId,
+        string hostExePath,
+        string appUserModelId,
+        string shortcutIconPath,
+        string manifestPath,
+        string displayTitle)
     {
         var startMenuPrograms = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
@@ -234,10 +359,18 @@ public partial class MainWindow : Window
             hostExePath,
             string.Empty,
             Path.GetDirectoryName(hostExePath)!,
-            "WinTiles 图片磁贴",
+            displayTitle,
             appUserModelId,
             shortcutIconPath,
             manifestPath);
+    }
+
+    private static void DeleteFileIfExists(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
     private PinAttemptRecord NormalizePinAttempt(
@@ -251,8 +384,8 @@ public partial class MainWindow : Window
             {
                 AttemptedAtUtc = DateTimeOffset.UtcNow,
                 RequestedSize = _viewModel.SelectedSize,
-                Status = PinHelperResultStatus.Success,
-                Message = "已触发系统固定命令并请求固定为 2x2",
+                Status = PinHelperResultStatus.Warning,
+                Message = $"已触发系统固定命令，但没有自动固定为 {_viewModel.SelectedSize.ToDisplayText()}，请检查开始菜单中的实际结果。",
                 PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}",
                 Warning = null,
                 IdentityKind = "AppUserModelID",
@@ -295,10 +428,10 @@ public partial class MainWindow : Window
             var message = pinResult.Message;
             var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
 
-            if (pinResult.Status == PinHelperResultStatus.Success)
+            if (shellPinResult.Invoked && pinResult.Status == PinHelperResultStatus.Failure)
             {
                 status = PinHelperResultStatus.Warning;
-                message = "已写入内部固定请求，但系统自动固定命令未触发，请检查开始菜单中的实际结果。";
+                message = "已触发系统固定命令，但磁贴尺寸刷新失败，请检查开始菜单中的实际结果。";
                 warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
             }
 
@@ -364,6 +497,8 @@ public partial class MainWindow : Window
             _viewModel.AvailabilityMessage = classicStartAvailability.Message;
             _viewModel.AvailabilityBrush = Brushes.SeaGreen;
         }
+
+        RefreshActionButtonsState();
     }
 
     private void RefreshPinButtonState()
@@ -378,6 +513,26 @@ public partial class MainWindow : Window
             !string.IsNullOrWhiteSpace(_selectedImagePath) &&
             _viewModel.IsClassicStartAvailable &&
             _viewModel.AreToolsAvailable;
+    }
+
+    private void RefreshClearButtonState()
+    {
+        if (ClearPinButton is null)
+        {
+            return;
+        }
+
+        // 清除按钮是“当前软件固定的全部磁贴”入口，不依赖当前是否已选图片。
+        ClearPinButton.IsEnabled =
+            !_viewModel.IsBusy &&
+            _viewModel.IsClassicStartAvailable &&
+            _viewModel.AreToolsAvailable;
+    }
+
+    private void RefreshActionButtonsState()
+    {
+        RefreshPinButtonState();
+        RefreshClearButtonState();
     }
 
     private void ApplySelectedSize(TileRequestSize size)
@@ -399,13 +554,18 @@ public partial class MainWindow : Window
         _viewModel.HasPreviewImage = true;
         _viewModel.PreviewImage = bitmap;
         _viewModel.PreviewTitle = Path.GetFileName(imagePath);
-        RefreshPinButtonState();
+        RefreshActionButtonsState();
     }
 
     private void SetStatus(string message, Brush brush)
     {
         _viewModel.StatusText = message;
         _viewModel.StatusBrush = brush;
+    }
+
+    private static string FormatTileMessage(TileRecord tileRecord, string message)
+    {
+        return $"{Path.GetFileNameWithoutExtension(tileRecord.ShortcutPath)}：{message}";
     }
 
     private static Brush MapStatusBrush(PinHelperResultStatus status) => status switch

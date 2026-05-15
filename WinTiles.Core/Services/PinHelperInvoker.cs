@@ -26,7 +26,7 @@ public sealed class PinHelperInvoker
         var startInfo = new ProcessStartInfo
         {
             FileName = pinHelperPath,
-            Arguments = PinHelperCommandLine.BuildArguments(tileId, requestedSize, hostExePath),
+            Arguments = PinHelperCommandLine.BuildPinArguments(tileId, requestedSize, hostExePath),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -42,10 +42,52 @@ public sealed class PinHelperInvoker
 
         var stdout = await stdoutTask.ConfigureAwait(false);
         var stderr = await stderrTask.ConfigureAwait(false);
-        return ParseResult(process.ExitCode, stdout, stderr, requestedSize);
+        return ParseResult(process.ExitCode, stdout, stderr, requestedSize, isClearOperation: false);
     }
 
-    private static PinHelperResult ParseResult(int exitCode, string stdout, string stderr, TileRequestSize requestedSize)
+    public async Task<PinHelperResult> UnpinImageAsync(
+        string pinHelperPath,
+        string tileId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(pinHelperPath))
+        {
+            return new PinHelperResult
+            {
+                Status = PinHelperResultStatus.Failure,
+                Message = $"未找到 PinHelper：{pinHelperPath}",
+                PinMethod = "Unavailable"
+            };
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = pinHelperPath,
+            Arguments = PinHelperCommandLine.BuildUnpinArguments(tileId),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = startInfo };
+        process.Start();
+
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+        var stdout = await stdoutTask.ConfigureAwait(false);
+        var stderr = await stderrTask.ConfigureAwait(false);
+        return ParseResult(process.ExitCode, stdout, stderr, TileRequestSize.Medium2x2, isClearOperation: true);
+    }
+
+    private static PinHelperResult ParseResult(
+        int exitCode,
+        string stdout,
+        string stderr,
+        TileRequestSize requestedSize,
+        bool isClearOperation)
     {
         if (!string.IsNullOrWhiteSpace(stdout))
         {
@@ -69,8 +111,8 @@ public sealed class PinHelperInvoker
                 {
                     Status = status,
                     Message = root.TryGetProperty("message", out var messageElement)
-                        ? messageElement.GetString() ?? BuildFallbackMessage(status, requestedSize)
-                        : BuildFallbackMessage(status, requestedSize),
+                        ? messageElement.GetString() ?? BuildFallbackMessage(status, requestedSize, isClearOperation)
+                        : BuildFallbackMessage(status, requestedSize, isClearOperation),
                     PinMethod = root.TryGetProperty("pinMethod", out var pinMethodElement)
                         ? pinMethodElement.GetString() ?? "Unknown"
                         : "Unknown",
@@ -108,17 +150,33 @@ public sealed class PinHelperInvoker
             Status = fallbackStatus,
             Message = !string.IsNullOrWhiteSpace(stderr)
                 ? stderr.Trim()
-                : BuildFallbackMessage(fallbackStatus, requestedSize),
+                : BuildFallbackMessage(fallbackStatus, requestedSize, isClearOperation),
             PinMethod = "Unknown",
             RawOutput = stdout,
             RawError = stderr
         };
     }
 
-    private static string BuildFallbackMessage(PinHelperResultStatus status, TileRequestSize requestedSize) => status switch
+    private static string BuildFallbackMessage(
+        PinHelperResultStatus status,
+        TileRequestSize requestedSize,
+        bool isClearOperation)
     {
-        PinHelperResultStatus.Success => $"已请求固定为 {requestedSize.ToDisplayText()}",
-        PinHelperResultStatus.Warning => "已固定，但系统可能未按请求尺寸显示",
-        _ => "固定图片失败，请查看详细提示。"
-    };
+        if (isClearOperation)
+        {
+            return status switch
+            {
+                PinHelperResultStatus.Success => "已清除固定",
+                PinHelperResultStatus.Warning => "已尝试清除固定，但系统可能未完全刷新",
+                _ => "清除固定失败，请查看详细提示。"
+            };
+        }
+
+        return status switch
+        {
+            PinHelperResultStatus.Success => $"已请求固定为 {requestedSize.ToDisplayText()}",
+            PinHelperResultStatus.Warning => "已固定，但系统可能未按请求尺寸显示",
+            _ => "固定图片失败，请查看详细提示。"
+        };
+    }
 }

@@ -9,6 +9,10 @@ public sealed class StartMenuShortcutService
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
         5);
 
+    private static readonly PROPERTYKEY TitleKey = new(
+        new Guid("F29F85E0-4FF9-1068-AB91-08002B27B3D9"),
+        2);
+
     private static readonly PROPERTYKEY RelaunchCommandKey = new(
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
         2);
@@ -48,6 +52,8 @@ public sealed class StartMenuShortcutService
             shellLink.SetIconLocation(effectiveIconPath, 0);
 
             var propertyStore = (IPropertyStore)shellLink;
+            // 让 Start 直接拿到稳定标题，避免把 .lnk 文件名里的随机后缀显示出来。
+            SetStringProperty(propertyStore, TitleKey, description);
             SetStringProperty(propertyStore, AppUserModelIdKey, appUserModelId);
             SetStringProperty(propertyStore, RelaunchCommandKey, $"\"{targetPath}\" {arguments}");
             SetStringProperty(propertyStore, RelaunchDisplayNameKey, description);
@@ -77,6 +83,22 @@ public sealed class StartMenuShortcutService
 
     public string? TryReadAppUserModelId(string shortcutPath)
     {
+        return TryReadStringProperty(shortcutPath, AppUserModelIdKey);
+    }
+
+    public string? TryReadTitle(string shortcutPath)
+    {
+        return TryReadStringProperty(shortcutPath, TitleKey);
+    }
+
+    private static void SetStringProperty(IPropertyStore propertyStore, PROPERTYKEY key, string value)
+    {
+        using var propVariant = PROPVARIANT.FromString(value);
+        propertyStore.SetValue(in key, in propVariant);
+    }
+
+    private static string? TryReadStringProperty(string shortcutPath, PROPERTYKEY key)
+    {
         if (!File.Exists(shortcutPath))
         {
             return null;
@@ -87,7 +109,7 @@ public sealed class StartMenuShortcutService
         {
             ((IPersistFile)shellLink).Load(shortcutPath, 0);
             var propertyStore = (IPropertyStore)shellLink;
-            propertyStore.GetValue(in AppUserModelIdKey, out var value);
+            propertyStore.GetValue(in key, out var value);
             try
             {
                 return value.GetString();
@@ -101,12 +123,6 @@ public sealed class StartMenuShortcutService
         {
             Marshal.FinalReleaseComObject(shellLink);
         }
-    }
-
-    private static void SetStringProperty(IPropertyStore propertyStore, PROPERTYKEY key, string value)
-    {
-        using var propVariant = PROPVARIANT.FromString(value);
-        propertyStore.SetValue(in key, in propVariant);
     }
 
     private static void NotifyShellAboutShortcut(string shortcutPath)

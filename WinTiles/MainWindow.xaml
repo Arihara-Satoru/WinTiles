@@ -49,6 +49,9 @@
                     <Button x:Name="PinImageButton"
                             Click="PinImageButton_Click"
                             Content="固定图片" />
+                    <Button x:Name="ClearPinButton"
+                            Click="ClearPinButton_Click"
+                            Content="清除全部固定" />
                 </StackPanel>
 
                 <TextBlock Grid.Row="3"
