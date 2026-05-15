@@ -7,6 +7,8 @@ public sealed class TileRecordStore
 {
     private const string TileRecordFileName = "tile-record.json";
     private const string PinAttemptFileName = "pin-attempt.json";
+    private const string BatchRootDirectoryName = "Batches";
+    private const string BatchRecordFileName = "batch-record.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -21,6 +23,8 @@ public sealed class TileRecordStore
 
     public string RootDirectory { get; }
 
+    public string BatchRootDirectory => Path.Combine(RootDirectory, BatchRootDirectoryName);
+
     public string CreateTileDirectory(string tileId)
     {
         var tileDirectory = GetTileDirectory(tileId);
@@ -29,6 +33,15 @@ public sealed class TileRecordStore
     }
 
     public string GetTileDirectory(string tileId) => Path.Combine(RootDirectory, tileId);
+
+    public string CreateBatchDirectory(string batchId)
+    {
+        var batchDirectory = GetBatchDirectory(batchId);
+        Directory.CreateDirectory(batchDirectory);
+        return batchDirectory;
+    }
+
+    public string GetBatchDirectory(string batchId) => Path.Combine(BatchRootDirectory, batchId);
 
     public async Task SaveTileRecordAsync(TileRecord record, CancellationToken cancellationToken = default)
     {
@@ -61,6 +74,11 @@ public sealed class TileRecordStore
         foreach (var tileDirectory in Directory.EnumerateDirectories(RootDirectory))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (string.Equals(Path.GetFileName(tileDirectory), BatchRootDirectoryName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
             var recordPath = Path.Combine(tileDirectory, TileRecordFileName);
             if (!File.Exists(recordPath))
@@ -114,12 +132,87 @@ public sealed class TileRecordStore
         return await JsonSerializer.DeserializeAsync<PinAttemptRecord>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task SaveTileBatchRecordAsync(TileBatchRecord record, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+
+        var batchDirectory = CreateBatchDirectory(record.BatchId);
+        var recordPath = Path.Combine(batchDirectory, BatchRecordFileName);
+        await using var stream = File.Create(recordPath);
+        await JsonSerializer.SerializeAsync(stream, record, JsonOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<TileBatchRecord?> LoadTileBatchRecordAsync(string batchId, CancellationToken cancellationToken = default)
+    {
+        var recordPath = Path.Combine(GetBatchDirectory(batchId), BatchRecordFileName);
+        if (!File.Exists(recordPath))
+        {
+            return null;
+        }
+
+        await using var stream = File.OpenRead(recordPath);
+        return await JsonSerializer.DeserializeAsync<TileBatchRecord>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<TileBatchRecord>> LoadAllTileBatchRecordsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(BatchRootDirectory))
+        {
+            return Array.Empty<TileBatchRecord>();
+        }
+
+        var records = new List<TileBatchRecord>();
+        foreach (var batchDirectory in Directory.EnumerateDirectories(BatchRootDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var recordPath = Path.Combine(batchDirectory, BatchRecordFileName);
+            if (!File.Exists(recordPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                await using var stream = File.OpenRead(recordPath);
+                var record = await JsonSerializer.DeserializeAsync<TileBatchRecord>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
+                if (record is not null)
+                {
+                    records.Add(record);
+                }
+            }
+            catch (JsonException)
+            {
+                // 批次记录损坏时跳过，避免一个坏批次影响全部历史读取。
+            }
+            catch (IOException)
+            {
+                // 文件被占用时继续读取其它批次。
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 权限异常不阻塞其它批次。
+            }
+        }
+
+        return records;
+    }
+
     public void DeleteTileDirectory(string tileId)
     {
         var tileDirectory = GetTileDirectory(tileId);
         if (Directory.Exists(tileDirectory))
         {
             Directory.Delete(tileDirectory, recursive: true);
+        }
+    }
+
+    public void DeleteBatchDirectory(string batchId)
+    {
+        var batchDirectory = GetBatchDirectory(batchId);
+        if (Directory.Exists(batchDirectory))
+        {
+            Directory.Delete(batchDirectory, recursive: true);
         }
     }
 }

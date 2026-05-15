@@ -31,6 +31,32 @@ public sealed class ImageAssetGeneratorTests : IDisposable
         Assert.True(new FileInfo(generatedAssets.ShortcutIconPath).Length > 0);
     }
 
+    [Fact]
+    public void GenerateAssets_with_explicit_crop_rectangle_uses_requested_source_region()
+    {
+        Directory.CreateDirectory(_workingDirectory);
+        var sourcePath = Path.Combine(_workingDirectory, "source-two-colors.png");
+
+        using (var bitmap = new Bitmap(200, 100))
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(Color.Red);
+            graphics.FillRectangle(Brushes.Blue, 100, 0, 100, 100);
+            bitmap.Save(sourcePath);
+        }
+
+        var generator = new ImageAssetGenerator();
+        var generatedAssets = generator.GenerateAssets(
+            sourcePath,
+            Path.Combine(_workingDirectory, "CroppedAssets"),
+            new RectangleF(100, 0, 100, 100));
+
+        using var image = new Bitmap(generatedAssets.Square150x150LogoPath);
+        var samplePixel = image.GetPixel(75, 75);
+
+        Assert.True(samplePixel.B > samplePixel.R);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))

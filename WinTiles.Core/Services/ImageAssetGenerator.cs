@@ -9,6 +9,11 @@ public sealed class ImageAssetGenerator
 {
     public GeneratedAssetSet GenerateAssets(string sourceImagePath, string assetsDirectory)
     {
+        return GenerateAssets(sourceImagePath, assetsDirectory, cropRectangle: null);
+    }
+
+    public GeneratedAssetSet GenerateAssets(string sourceImagePath, string assetsDirectory, RectangleF? cropRectangle)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceImagePath);
         if (!File.Exists(sourceImagePath))
         {
@@ -24,11 +29,11 @@ public sealed class ImageAssetGenerator
         var square310Path = Path.Combine(assetsDirectory, "Square310x310Logo.png");
         var shortcutIconPath = Path.Combine(assetsDirectory, "ShortcutIcon.ico");
 
-        SaveResizedImage(sourceImage, square70Path, 70, 70);
-        SaveResizedImage(sourceImage, square150Path, 150, 150);
-        SaveResizedImage(sourceImage, wide310x150Path, 310, 150);
-        SaveResizedImage(sourceImage, square310Path, 310, 310);
-        SavePngBackedIcon(sourceImage, shortcutIconPath, 256);
+        SaveResizedImage(sourceImage, square70Path, 70, 70, cropRectangle);
+        SaveResizedImage(sourceImage, square150Path, 150, 150, cropRectangle);
+        SaveResizedImage(sourceImage, wide310x150Path, 310, 150, cropRectangle);
+        SaveResizedImage(sourceImage, square310Path, 310, 310, cropRectangle);
+        SavePngBackedIcon(sourceImage, shortcutIconPath, 256, cropRectangle);
 
         return new GeneratedAssetSet
         {
@@ -41,7 +46,12 @@ public sealed class ImageAssetGenerator
     }
 
     // 这里统一采用“居中裁剪 + 高质量缩放”，让任意图片都能平整铺满磁贴。
-    private static void SaveResizedImage(Image sourceImage, string destinationPath, int targetWidth, int targetHeight)
+    private static void SaveResizedImage(
+        Image sourceImage,
+        string destinationPath,
+        int targetWidth,
+        int targetHeight,
+        RectangleF? cropRectangle)
     {
         using var bitmap = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(bitmap);
@@ -51,7 +61,9 @@ public sealed class ImageAssetGenerator
         graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
         graphics.SmoothingMode = SmoothingMode.HighQuality;
 
-        var sourceRectangle = CalculateCoverCrop(sourceImage.Width, sourceImage.Height, targetWidth, targetHeight);
+        var sourceRectangle = cropRectangle is { } explicitCropRectangle
+            ? ClampCropRectangle(explicitCropRectangle, sourceImage.Width, sourceImage.Height)
+            : CalculateCoverCrop(sourceImage.Width, sourceImage.Height, targetWidth, targetHeight);
         graphics.DrawImage(
             sourceImage,
             new Rectangle(0, 0, targetWidth, targetHeight),
@@ -61,9 +73,9 @@ public sealed class ImageAssetGenerator
     }
 
     // 这里输出一个 PNG 承载的 .ico，让壳层即使回退到快捷方式图标，也能直接显示用户图片。
-    private static void SavePngBackedIcon(Image sourceImage, string destinationPath, int iconSize)
+    private static void SavePngBackedIcon(Image sourceImage, string destinationPath, int iconSize, RectangleF? cropRectangle)
     {
-        var pngBytes = RenderPngBytes(sourceImage, iconSize, iconSize);
+        var pngBytes = RenderPngBytes(sourceImage, iconSize, iconSize, cropRectangle);
         using var stream = File.Create(destinationPath);
         using var writer = new BinaryWriter(stream);
 
@@ -81,7 +93,7 @@ public sealed class ImageAssetGenerator
         writer.Write(pngBytes);
     }
 
-    private static byte[] RenderPngBytes(Image sourceImage, int targetWidth, int targetHeight)
+    private static byte[] RenderPngBytes(Image sourceImage, int targetWidth, int targetHeight, RectangleF? cropRectangle)
     {
         using var bitmap = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(bitmap);
@@ -91,7 +103,9 @@ public sealed class ImageAssetGenerator
         graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
         graphics.SmoothingMode = SmoothingMode.HighQuality;
 
-        var sourceRectangle = CalculateCoverCrop(sourceImage.Width, sourceImage.Height, targetWidth, targetHeight);
+        var sourceRectangle = cropRectangle is { } explicitCropRectangle
+            ? ClampCropRectangle(explicitCropRectangle, sourceImage.Width, sourceImage.Height)
+            : CalculateCoverCrop(sourceImage.Width, sourceImage.Height, targetWidth, targetHeight);
         graphics.DrawImage(
             sourceImage,
             new Rectangle(0, 0, targetWidth, targetHeight),
@@ -101,6 +115,17 @@ public sealed class ImageAssetGenerator
         using var memoryStream = new MemoryStream();
         bitmap.Save(memoryStream, ImageFormat.Png);
         return memoryStream.ToArray();
+    }
+
+    private static RectangleF ClampCropRectangle(RectangleF cropRectangle, int sourceWidth, int sourceHeight)
+    {
+        var clampedX = Math.Clamp(cropRectangle.X, 0f, sourceWidth - 1f);
+        var clampedY = Math.Clamp(cropRectangle.Y, 0f, sourceHeight - 1f);
+        var maxWidth = Math.Max(1f, sourceWidth - clampedX);
+        var maxHeight = Math.Max(1f, sourceHeight - clampedY);
+        var clampedWidth = Math.Clamp(cropRectangle.Width, 1f, maxWidth);
+        var clampedHeight = Math.Clamp(cropRectangle.Height, 1f, maxHeight);
+        return new RectangleF(clampedX, clampedY, clampedWidth, clampedHeight);
     }
 
     private static RectangleF CalculateCoverCrop(int sourceWidth, int sourceHeight, int targetWidth, int targetHeight)
