@@ -29,7 +29,7 @@
 
         <Grid Margin="24">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="430" />
+                <ColumnDefinition Width="390" />
                 <ColumnDefinition Width="24" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
@@ -39,9 +39,6 @@
                     Padding="28">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -115,16 +112,16 @@
                                        Foreground="{StaticResource PrimaryTextBrush}"
                                        Text="WinTiles" />
                             <TextBlock Margin="0,12,0,0"
-                                       Width="272"
+                                       Width="240"
                                        FontSize="16"
                                        Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="把喜欢的图片固定成开始菜单磁贴，也可以回看固定历史并删除单条记录。"
+                                       Text="把一张图片拆成多个开始菜单磁贴，按你的裁切布局依次固定。"
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1"
-                                Margin="0,28,0,8">
+                                Margin="0,30,0,0">
                         <Button x:Name="SelectImageButton"
                                 Style="{StaticResource PrimaryActionButtonStyle}"
                                 Click="SelectImageButton_Click">
@@ -170,7 +167,8 @@
 
                         <Button x:Name="PinImageButton"
                                 Style="{StaticResource SecondaryActionButtonStyle}"
-                                Click="PinImageButton_Click">
+                                Click="PinImageButton_Click"
+                                IsEnabled="{Binding CanPinImage}">
                             <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Center">
                                 <Border Width="30"
@@ -216,352 +214,54 @@
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="ClearPinButton"
-                                Style="{StaticResource DangerActionButtonStyle}"
-                                Click="ClearPinButton_Click">
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center">
-                                <Border Width="30"
-                                        Height="30"
-                                        Margin="0,0,12,0"
-                                        Background="#FFFFFF"
-                                        BorderBrush="#F3CAD3"
-                                        BorderThickness="1"
-                                        CornerRadius="10">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="18"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource DangerBrush}"
-                                               Text="×" />
-                                </Border>
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="清除全部固定" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-
-                    <Border Grid.Row="2"
-                            Margin="0,14,0,22"
-                            Height="1"
-                            Background="#E3EAF3" />
-
-                    <StackPanel Grid.Row="3"
-                                Margin="0,0,0,18">
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="10"
-                                         Height="10"
-                                         Margin="0,7,10,0"
-                                         Fill="{StaticResource PrimaryAccentBrush}" />
-                                <TextBlock FontSize="17"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource PrimaryTextBrush}"
-                                           Text="固定历史" />
-                            </StackPanel>
-
-                            <Border Grid.Column="1"
-                                    Margin="12,0,0,0"
-                                    Padding="12,6"
-                                    Background="{StaticResource PrimaryAccentSoftBrush}"
-                                    BorderBrush="#D6E4FB"
-                                    BorderThickness="1"
-                                    CornerRadius="999">
-                                <TextBlock FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource PrimaryAccentBrush}"
-                                           Text="{Binding HistoryCountText}" />
-                            </Border>
-                        </Grid>
-
-                        <TextBlock Margin="0,0,0,14"
-                                   FontSize="13"
-                                   Foreground="{StaticResource SecondaryTextBrush}"
-                                   Text="点击条目后，右侧会显示对应图片；选中历史后可以直接删除这一条。"
-                                   TextWrapping="Wrap" />
-
-                        <Border Style="{StaticResource InsetCardStyle}"
-                                Padding="12"
-                                ClipToBounds="True">
-                            <Grid>
-                                <ListBox x:Name="HistoryListBox"
-                                         Background="Transparent"
-                                         BorderThickness="0"
-                                         MaxHeight="420"
-                                         MinHeight="240"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                         SelectionChanged="HistoryListBox_SelectionChanged"
-                                         Visibility="{Binding HasHistoryItems, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <ListBox.ItemContainerStyle>
-                                        <Style TargetType="ListBoxItem">
-                                            <Setter Property="Margin" Value="0,0,0,12" />
-                                            <Setter Property="Padding" Value="0" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                                            <Setter Property="Background" Value="Transparent" />
-                                            <Setter Property="BorderBrush" Value="Transparent" />
-                                            <Setter Property="BorderThickness" Value="1" />
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="ListBoxItem">
-                                                        <Border x:Name="Root"
-                                                                Background="{TemplateBinding Background}"
-                                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                                CornerRadius="22">
-                                                            <ContentPresenter />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsSelected" Value="True">
-                                                                <Setter TargetName="Root" Property="Background" Value="#ECF4FF" />
-                                                                <Setter TargetName="Root" Property="BorderBrush" Value="#B8D0FA" />
-                                                            </Trigger>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Root" Property="Background" Value="#F7FAFF" />
-                                                                <Setter TargetName="Root" Property="BorderBrush" Value="#D8E5F5" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </ListBox.ItemContainerStyle>
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="14,13">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="82" />
-                                                    <ColumnDefinition Width="14" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="14" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-
-                                                <Border Width="82"
-                                                        Height="82"
-                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
-                                                        BorderBrush="#D5E3FB"
-                                                        BorderThickness="1"
-                                                        CornerRadius="20"
-                                                        ClipToBounds="True">
-                                                    <Grid>
-                                                        <Image Source="{Binding ThumbnailImage}"
-                                                               Stretch="UniformToFill"
-                                                               Visibility="Visible">
-                                                            <Image.Style>
-                                                                <Style TargetType="Image">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
-                                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Image.Style>
-                                                        </Image>
-
-                                                        <StackPanel HorizontalAlignment="Center"
-                                                                    VerticalAlignment="Center">
-                                                            <StackPanel.Style>
-                                                                <Style TargetType="StackPanel">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
-                                                                            <Setter Property="Visibility" Value="Visible" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </StackPanel.Style>
-                                                            <Border Width="38"
-                                                                    Height="38"
-                                                                    Background="{StaticResource PrimaryAccentSoftBrush}"
-                                                                    BorderBrush="#D5E3FB"
-                                                                    BorderThickness="1"
-                                                                    CornerRadius="14">
-                                                                <TextBlock HorizontalAlignment="Center"
-                                                                           VerticalAlignment="Center"
-                                                                           FontSize="16"
-                                                                           FontWeight="SemiBold"
-                                                                           Foreground="{StaticResource PrimaryAccentBrush}"
-                                                                           Text="无图" />
-                                                            </Border>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Border>
-
-                                                <StackPanel Grid.Column="2"
-                                                            VerticalAlignment="Center">
-                                                    <TextBlock FontSize="16"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{StaticResource PrimaryTextBrush}"
-                                                               Text="{Binding DisplayTitle}"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Margin="0,6,0,0"
-                                                               FontSize="13"
-                                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                                               Text="{Binding AttemptedAtText}" />
-                                                    <TextBlock Margin="0,6,0,0"
-                                                               FontSize="13"
-                                                               Foreground="{Binding DetailBrush}"
-                                                               Text="{Binding DetailText}"
-                                                               TextWrapping="Wrap" />
-                                                </StackPanel>
-
-                                                <Border Grid.Column="4"
-                                                        Padding="12,8"
-                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
-                                                        BorderBrush="#D6E4FB"
-                                                        BorderThickness="1"
-                                                        CornerRadius="999"
-                                                        VerticalAlignment="Center">
-                                                    <TextBlock FontSize="13"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{StaticResource PrimaryAccentBrush}"
-                                                               Text="{Binding RequestedSizeText}" />
-                                                </Border>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-
-                                <StackPanel HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasHistoryItems}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-                                    <Border Width="88"
-                                            Height="88"
-                                            HorizontalAlignment="Center"
-                                            Background="{StaticResource PrimaryAccentSoftBrush}"
-                                            BorderBrush="#D5E3FB"
-                                            BorderThickness="1"
-                                            CornerRadius="24">
-                                        <TextBlock HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="26"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource PrimaryAccentBrush}"
-                                                   Text="历史" />
-                                    </Border>
-                                    <TextBlock Margin="0,16,0,0"
-                                               HorizontalAlignment="Center"
-                                               FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource PrimaryTextBrush}"
-                                               Text="尚未固定历史" />
-                                    <TextBlock Margin="0,10,0,0"
-                                               HorizontalAlignment="Center"
-                                               FontSize="14"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="先选择图片并固定，历史会自动出现在这里。"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="4"
-                                Margin="0,0,0,18">
-                        <StackPanel Orientation="Horizontal"
-                                    Margin="0,0,0,12">
-                            <Ellipse Width="10"
-                                     Height="10"
-                                     Margin="0,7,10,0"
-                                     Fill="{StaticResource PrimaryAccentBrush}" />
-                            <TextBlock FontSize="17"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource PrimaryTextBrush}"
-                                       Text="本地记录" />
-                        </StackPanel>
-
-                        <Border Style="{StaticResource InsetCardStyle}"
-                                Padding="18">
+                        <Button x:Name="ShowHistoryButton"
+                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                Click="ShowHistoryButton_Click"
+                                IsEnabled="{Binding CanOpenHistory}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <Border Width="46"
-                                        Height="46"
-                                        Background="#EAF2FF"
-                                        BorderBrush="#D5E3FB"
-                                        BorderThickness="1"
-                                        CornerRadius="14">
-                                    <Viewbox Margin="10">
-                                        <Canvas Width="24"
-                                                Height="24">
-                                            <Path Data="M3,7 H9 L11,9 H21 V19 H3 Z"
-                                                  Fill="Transparent"
-                                                  Stroke="{StaticResource PrimaryAccentBrush}"
-                                                  StrokeThickness="1.6"
-                                                  StrokeLineJoin="Round" />
-                                            <Path Data="M3,9 H21"
-                                                  Stroke="{StaticResource PrimaryAccentBrush}"
-                                                  StrokeThickness="1.6"
-                                                  StrokeStartLineCap="Round"
-                                                  StrokeEndLineCap="Round" />
-                                        </Canvas>
-                                    </Viewbox>
-                                </Border>
-
-                                <StackPanel Grid.Column="1"
-                                            Margin="14,0,14,0"
-                                            VerticalAlignment="Center">
-                                    <TextBlock FontSize="18"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource PrimaryTextBrush}"
-                                               Text="记录目录" />
-                                    <TextBlock Margin="0,8,0,0"
-                                               FontSize="13"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="{Binding RecordLocationText}"
-                                               TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center">
+                                    <Border Width="30"
+                                            Height="30"
+                                            Margin="0,0,12,0"
+                                            Background="{StaticResource PrimaryAccentSoftBrush}"
+                                            BorderBrush="#D4E4FF"
+                                            BorderThickness="1"
+                                            CornerRadius="10">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                   Text="历" />
+                                    </Border>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Text="固定历史" />
                                 </StackPanel>
 
-                                <Button Grid.Column="2"
-                                        Width="48"
-                                        Height="48"
-                                        Margin="0"
-                                        Padding="0"
-                                        Style="{StaticResource IconButtonStyle}"
-                                        Click="OpenRecordFolderButton_Click">
-                                    <Viewbox Width="20"
-                                             Height="20">
-                                        <Canvas Width="24"
-                                                Height="24">
-                                            <Path Data="M3,7 H9 L11,9 H21 V19 H3 Z"
-                                                  Fill="#FFFFFF"
-                                                  Stroke="{StaticResource PrimaryAccentBrush}"
-                                                  StrokeThickness="1.6"
-                                                  StrokeLineJoin="Round" />
-                                            <Path Data="M3,9 H21"
-                                                  Stroke="{StaticResource PrimaryAccentBrush}"
-                                                  StrokeThickness="1.6"
-                                                  StrokeStartLineCap="Round"
-                                                  StrokeEndLineCap="Round" />
-                                        </Canvas>
-                                    </Viewbox>
-                                </Button>
+                                <Border Grid.Column="1"
+                                        Margin="16,0,0,0"
+                                        Padding="10,6"
+                                        VerticalAlignment="Center"
+                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                        BorderBrush="#D6E4FB"
+                                        BorderThickness="1"
+                                        CornerRadius="999">
+                                    <TextBlock FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryAccentBrush}"
+                                               Text="{Binding HistoryCountText}" />
+                                </Border>
                             </Grid>
-                        </Border>
+                        </Button>
                     </StackPanel>
 
-                    <Border Grid.Row="6"
+                    <Border Grid.Row="3"
                             Padding="14,12"
                             Background="{StaticResource InfoSoftBrush}"
                             BorderBrush="{StaticResource InfoBorderBrush}"
@@ -585,133 +285,18 @@
                     Padding="28">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Grid Grid.Row="0"
+                          Visibility="{Binding IsCropMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                        <StackPanel>
-                            <TextBlock FontSize="26"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource PrimaryTextBrush}"
-                                       Text="预览区" />
-                            <TextBlock Margin="0,10,0,0"
-                                       FontSize="15"
-                                       Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="选择图片后可先预览；点击左侧历史条目时，这里会切换到对应固定。"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <Border Grid.Column="1"
-                                Margin="18,2,0,0"
-                                Padding="12,8"
-                                Background="{StaticResource PrimaryAccentSoftBrush}"
-                                BorderBrush="#D6E4FB"
-                                BorderThickness="1"
-                                CornerRadius="999">
-                            <TextBlock FontSize="13"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource PrimaryAccentBrush}"
-                                       Text="{Binding SelectedHistoryBadgeText}" />
-                        </Border>
-                    </Grid>
-
-                    <Border Grid.Row="1"
-                            Margin="0,24,0,0"
-                            Style="{StaticResource InsetCardStyle}"
-                            Padding="20"
-                            ClipToBounds="True">
-                        <Grid>
-                            <Border CornerRadius="28"
-                                    Background="#EEF5FD"
-                                    BorderBrush="#D5E1F0"
-                                    BorderThickness="1"
-                                    ClipToBounds="True">
-                                <Grid>
-                                    <Image Source="{Binding PreviewImage}"
-                                           Stretch="Uniform"
-                                           HorizontalAlignment="Stretch"
-                                           VerticalAlignment="Stretch" />
-
-                                    <StackPanel HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasPreviewImage}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
-                                        <Border Width="88"
-                                                Height="88"
-                                                HorizontalAlignment="Center"
-                                                Background="{StaticResource PrimaryAccentSoftBrush}"
-                                                BorderBrush="#D5E3FB"
-                                                BorderThickness="1"
-                                                CornerRadius="24">
-                                            <Viewbox Margin="20">
-                                                <Canvas Width="24"
-                                                        Height="24">
-                                                    <Rectangle Width="19"
-                                                               Height="14"
-                                                               Canvas.Left="2.5"
-                                                               Canvas.Top="4.5"
-                                                               RadiusX="2.8"
-                                                               RadiusY="2.8"
-                                                               Stroke="{StaticResource PrimaryAccentBrush}"
-                                                               StrokeThickness="1.5"
-                                                               Fill="Transparent" />
-                                                    <Ellipse Width="3"
-                                                             Height="3"
-                                                             Canvas.Left="6"
-                                                             Canvas.Top="7"
-                                                             Fill="{StaticResource PrimaryAccentBrush}" />
-                                                    <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
-                                                              Stroke="{StaticResource PrimaryAccentBrush}"
-                                                              StrokeThickness="1.8"
-                                                              StrokeStartLineCap="Round"
-                                                              StrokeEndLineCap="Round"
-                                                              StrokeLineJoin="Round" />
-                                                </Canvas>
-                                            </Viewbox>
-                                        </Border>
-                                        <TextBlock Margin="0,18,0,0"
-                                                   HorizontalAlignment="Center"
-                                                   FontSize="22"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource PrimaryTextBrush}"
-                                                   Text="{Binding PreviewTitle}"
-                                                   TextWrapping="Wrap"
-                                                   TextAlignment="Center" />
-                                        <TextBlock Margin="0,10,0,0"
-                                                   HorizontalAlignment="Center"
-                                                   FontSize="15"
-                                                   Foreground="{StaticResource SecondaryTextBrush}"
-                                                   Text="点击左侧历史条目，或先选择图片开始预览"
-                                                   TextAlignment="Center"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Row="2"
-                            Margin="0,20,0,0"
-                            Padding="18"
-                            Background="{StaticResource InsetSurfaceBrush}"
-                            BorderBrush="{StaticResource InsetBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="24">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -719,29 +304,604 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel>
-                                <TextBlock FontSize="15"
+                                <TextBlock FontSize="26"
                                            FontWeight="SemiBold"
-                                           Foreground="{Binding StatusBrush}"
-                                           Text="{Binding StatusText}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Margin="0,8,0,0"
-                                           FontSize="13"
+                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                           Text="预览区 · 图片裁切" />
+                                <TextBlock Margin="0,10,0,0"
+                                           FontSize="15"
                                            Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="删除会同时移除开始菜单磁贴和本地记录。"
+                                           Text="{Binding CropSubtitle}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
 
-                            <Button x:Name="DeleteSelectedHistoryButton"
-                                    Grid.Column="1"
-                                    Width="180"
-                                    Style="{StaticResource DangerActionButtonStyle}"
-                                    Click="DeleteSelectedHistoryButton_Click"
-                                    IsEnabled="{Binding CanDeleteSelectedHistory}">
-                                <TextBlock VerticalAlignment="Center"
-                                           HorizontalAlignment="Center"
-                                           Text="删除选中历史" />
-                            </Button>
+                            <Border Grid.Column="1"
+                                    Margin="18,2,0,0"
+                                    Padding="12,8"
+                                    Background="{StaticResource PrimaryAccentSoftBrush}"
+                                    BorderBrush="#D6E4FB"
+                                    BorderThickness="1"
+                                    CornerRadius="999">
+                                <TextBlock FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryAccentBrush}"
+                                           Text="{Binding ZoomText}" />
+                            </Border>
                         </Grid>
+
+                        <Grid x:Name="CropBoardHost"
+                              Grid.Row="1"
+                              Margin="0,24,0,0"
+                              SizeChanged="CropBoardHost_SizeChanged">
+                            <Border x:Name="CropBoardBorder"
+                                    Width="{Binding CropBoardSize}"
+                                    Height="{Binding CropBoardSize}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Background="#EEF5FD"
+                                    BorderBrush="#D5E1F0"
+                                    BorderThickness="1"
+                                    CornerRadius="30"
+                                    ClipToBounds="True"
+                                    Cursor="SizeAll"
+                                    MouseLeftButtonDown="CropBoardBorder_MouseLeftButtonDown"
+                                    MouseLeftButtonUp="CropBoardBorder_MouseLeftButtonUp"
+                                    MouseMove="CropBoardBorder_MouseMove"
+                                    MouseLeave="CropBoardBorder_MouseLeave"
+                                    PreviewMouseWheel="CropBoardBorder_PreviewMouseWheel">
+                                <Grid Background="#EEF5FD">
+                                    <Canvas x:Name="CropImageCanvas"
+                                            ClipToBounds="True">
+                                        <Image x:Name="CropImageElement"
+                                               Source="{Binding CropImage}"
+                                               Stretch="Fill"
+                                               RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.RenderTransform>
+                                                <TransformGroup>
+                                                    <ScaleTransform x:Name="CropImageScaleTransform" />
+                                                    <TranslateTransform x:Name="CropImageTranslateTransform" />
+                                                </TransformGroup>
+                                            </Image.RenderTransform>
+                                        </Image>
+                                    </Canvas>
+
+                                    <ItemsControl ItemsSource="{Binding CropCells}"
+                                                  IsHitTestVisible="False">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Canvas.Left"
+                                                        Value="{Binding Left}" />
+                                                <Setter Property="Canvas.Top"
+                                                        Value="{Binding Top}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Width="{Binding Size}"
+                                                      Height="{Binding Size}">
+                                                    <Rectangle x:Name="InactiveCell"
+                                                               RadiusX="22"
+                                                               RadiusY="22"
+                                                               Fill="#F9FCFFDD"
+                                                               Stroke="#C9D8EC"
+                                                               StrokeThickness="1.5"
+                                                               StrokeDashArray="7 5" />
+                                                    <Border x:Name="ActiveCell"
+                                                            Background="#182F7DFF"
+                                                            BorderBrush="#6BA7FF"
+                                                            BorderThickness="2"
+                                                            CornerRadius="22"
+                                                            Visibility="Collapsed" />
+                                                    <TextBlock x:Name="PlusText"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="28"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="#79A9FF"
+                                                               Text="+" />
+                                                    <Border x:Name="OrderBadge"
+                                                            Width="34"
+                                                            Height="34"
+                                                            Margin="10"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Top"
+                                                            Background="#FDFEFF"
+                                                            BorderBrush="#D6E4FB"
+                                                            BorderThickness="1"
+                                                            CornerRadius="17"
+                                                            Visibility="Collapsed">
+                                                        <TextBlock HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                                   Text="{Binding SelectionOrderText}" />
+                                                    </Border>
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}"
+                                                                 Value="True">
+                                                        <Setter TargetName="InactiveCell"
+                                                                Property="Visibility"
+                                                                Value="Collapsed" />
+                                                        <Setter TargetName="PlusText"
+                                                                Property="Visibility"
+                                                                Value="Collapsed" />
+                                                        <Setter TargetName="ActiveCell"
+                                                                Property="Visibility"
+                                                                Value="Visible" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ShowSelectionOrder}"
+                                                                 Value="True">
+                                                        <Setter TargetName="OrderBadge"
+                                                                Property="Visibility"
+                                                                Value="Visible" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Grid IsHitTestVisible="False">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasCropImage}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <StackPanel HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                            <Border Width="92"
+                                                    Height="92"
+                                                    HorizontalAlignment="Center"
+                                                    Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                    BorderBrush="#D5E3FB"
+                                                    BorderThickness="1"
+                                                    CornerRadius="26">
+                                                <Viewbox Margin="20">
+                                                    <Canvas Width="24"
+                                                            Height="24">
+                                                        <Rectangle Width="19"
+                                                                   Height="14"
+                                                                   Canvas.Left="2.5"
+                                                                   Canvas.Top="4.5"
+                                                                   RadiusX="2.8"
+                                                                   RadiusY="2.8"
+                                                                   Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                   StrokeThickness="1.5"
+                                                                   Fill="Transparent" />
+                                                        <Ellipse Width="3"
+                                                                 Height="3"
+                                                                 Canvas.Left="6"
+                                                                 Canvas.Top="7"
+                                                                 Fill="{StaticResource PrimaryAccentBrush}" />
+                                                        <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
+                                                                  Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                  StrokeThickness="1.8"
+                                                                  StrokeStartLineCap="Round"
+                                                                  StrokeEndLineCap="Round"
+                                                                  StrokeLineJoin="Round" />
+                                                    </Canvas>
+                                                </Viewbox>
+                                            </Border>
+                                            <TextBlock Margin="0,18,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       FontSize="22"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                                       Text="先选择图片，再调整裁切" />
+                                            <TextBlock Margin="0,10,0,0"
+                                                       Width="340"
+                                                       HorizontalAlignment="Center"
+                                                       FontSize="15"
+                                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                                       Text="你也可以先点击某些格子启用区域，再上传图片。上传后滚轮缩放、拖拽位置都会对整张图一起生效。"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                Margin="0,20,0,0"
+                                Padding="18"
+                                Background="{StaticResource InsetSurfaceBrush}"
+                                BorderBrush="{StaticResource InsetBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="24">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock FontSize="15"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryAccentBrush}"
+                                               Text="{Binding SelectionSummaryText}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="固定顺序按从上到下、从左到右；滚轮缩到刚好铺满启用区域时会自动吸附。"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <Button x:Name="ClearCropSelectionButton"
+                                        Grid.Column="1"
+                                        Width="180"
+                                        Style="{StaticResource DangerActionButtonStyle}"
+                                        Click="ClearCropSelectionButton_Click"
+                                        IsEnabled="{Binding CanClearSelection}">
+                                    <TextBlock VerticalAlignment="Center"
+                                               HorizontalAlignment="Center"
+                                               Text="清空所有区域" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="0"
+                          Visibility="{Binding IsHistoryMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <TextBlock FontSize="26"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                           Text="固定历史" />
+                                <TextBlock Margin="0,10,0,0"
+                                           FontSize="15"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="按批次查看这一轮裁切固定的结果；展开后可以删除单块，也可以整批清理。"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="18,0,0,0"
+                                        Orientation="Horizontal">
+                                <Button x:Name="BackToCropButton"
+                                        Width="138"
+                                        Margin="0,0,12,0"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Click="BackToCropButton_Click">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="返回裁切" />
+                                </Button>
+                                <Button x:Name="OpenRecordFolderButton"
+                                        Width="148"
+                                        Margin="0,0,12,0"
+                                        Style="{StaticResource SecondaryActionButtonStyle}"
+                                        Click="OpenRecordFolderButton_Click"
+                                        IsEnabled="{Binding CanOpenRecordFolder}">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="打开记录目录" />
+                                </Button>
+                                <Button x:Name="ClearAllPinnedTilesButton"
+                                        Width="176"
+                                        Style="{StaticResource DangerActionButtonStyle}"
+                                        Click="ClearAllPinnedTilesButton_Click"
+                                        IsEnabled="{Binding CanClearAllPinnedTiles}">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="清除全部固定" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Margin="0,24,0,0"
+                                Style="{StaticResource InsetCardStyle}"
+                                Padding="18"
+                                ClipToBounds="True">
+                            <Grid>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Visibility="{Binding HasHistoryItems, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <ItemsControl ItemsSource="{Binding BatchHistoryItems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,16"
+                                                        Padding="16"
+                                                        Background="#FCFEFF"
+                                                        BorderBrush="#DAE5F3"
+                                                        BorderThickness="1"
+                                                        CornerRadius="24">
+                                                    <Expander IsExpanded="{Binding IsExpanded}"
+                                                              Background="Transparent"
+                                                              BorderThickness="0">
+                                                        <Expander.Header>
+                                                            <Grid Margin="0,0,10,0">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="82" />
+                                                                    <ColumnDefinition Width="14" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="18" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Border Width="82"
+                                                                        Height="82"
+                                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                                        BorderBrush="#D5E3FB"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="20"
+                                                                        ClipToBounds="True">
+                                                                    <Grid>
+                                                                        <Image Source="{Binding ThumbnailImage}"
+                                                                               Stretch="UniformToFill"
+                                                                               Visibility="Visible">
+                                                                            <Image.Style>
+                                                                                <Style TargetType="Image">
+                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Image.Style>
+                                                                        </Image>
+                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                   VerticalAlignment="Center"
+                                                                                   FontSize="16"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                                                   Text="图片">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </Grid>
+                                                                </Border>
+
+                                                                <StackPanel Grid.Column="2"
+                                                                            VerticalAlignment="Center">
+                                                                    <TextBlock FontSize="18"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                                                               Text="{Binding DisplayTitle}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Margin="0,6,0,0"
+                                                                               FontSize="13"
+                                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                                               Text="{Binding AttemptedAtText}" />
+                                                                    <TextBlock Margin="0,6,0,0"
+                                                                               FontSize="13"
+                                                                               Foreground="{Binding SummaryBrush}"
+                                                                               Text="{Binding SummaryText}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+
+                                                                <StackPanel Grid.Column="4"
+                                                                            VerticalAlignment="Center">
+                                                                    <Border Padding="12,8"
+                                                                            Margin="0,0,0,8"
+                                                                            Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                                            BorderBrush="#D6E4FB"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="999">
+                                                                        <TextBlock FontSize="13"
+                                                                                   FontWeight="SemiBold"
+                                                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                                                   Text="{Binding TileCountText}" />
+                                                                    </Border>
+                                                                    <TextBlock HorizontalAlignment="Right"
+                                                                               FontSize="12"
+                                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                                               Text="{Binding SuccessCount, StringFormat=成功 {0} 块}" />
+                                                                    <TextBlock HorizontalAlignment="Right"
+                                                                               FontSize="12"
+                                                                               Foreground="{StaticResource DangerBrush}"
+                                                                               Text="{Binding FailureCount, StringFormat=失败 {0} 块}" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Expander.Header>
+
+                                                        <StackPanel Margin="0,16,0,0">
+                                                            <ItemsControl ItemsSource="{Binding Tiles}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border Margin="0,0,0,12"
+                                                                                Padding="14"
+                                                                                Background="{StaticResource InsetSurfaceBrush}"
+                                                                                BorderBrush="{StaticResource InsetBorderBrush}"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="20">
+                                                                            <Grid>
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="72" />
+                                                                                    <ColumnDefinition Width="14" />
+                                                                                    <ColumnDefinition Width="*" />
+                                                                                    <ColumnDefinition Width="14" />
+                                                                                    <ColumnDefinition Width="Auto" />
+                                                                                </Grid.ColumnDefinitions>
+
+                                                                                <Border Width="72"
+                                                                                        Height="72"
+                                                                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                                                                        BorderBrush="#D5E3FB"
+                                                                                        BorderThickness="1"
+                                                                                        CornerRadius="18"
+                                                                                        ClipToBounds="True">
+                                                                                    <Grid>
+                                                                                        <Image Source="{Binding ThumbnailImage}"
+                                                                                               Stretch="UniformToFill"
+                                                                                               Visibility="Visible">
+                                                                                            <Image.Style>
+                                                                                                <Style TargetType="Image">
+                                                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                                                    <Style.Triggers>
+                                                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                                                        </DataTrigger>
+                                                                                                    </Style.Triggers>
+                                                                                                </Style>
+                                                                                            </Image.Style>
+                                                                                        </Image>
+                                                                                        <TextBlock HorizontalAlignment="Center"
+                                                                                                   VerticalAlignment="Center"
+                                                                                                   FontSize="14"
+                                                                                                   FontWeight="SemiBold"
+                                                                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                                                                   Text="预览">
+                                                                                            <TextBlock.Style>
+                                                                                                <Style TargetType="TextBlock">
+                                                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                                                    <Style.Triggers>
+                                                                                                        <DataTrigger Binding="{Binding HasThumbnailImage}" Value="False">
+                                                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                                                        </DataTrigger>
+                                                                                                    </Style.Triggers>
+                                                                                                </Style>
+                                                                                            </TextBlock.Style>
+                                                                                        </TextBlock>
+                                                                                    </Grid>
+                                                                                </Border>
+
+                                                                                <StackPanel Grid.Column="2"
+                                                                                            VerticalAlignment="Center">
+                                                                                    <TextBlock FontSize="16"
+                                                                                               FontWeight="SemiBold"
+                                                                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                                                                               Text="{Binding GridPositionText}" />
+                                                                                    <TextBlock Margin="0,4,0,0"
+                                                                                               FontSize="13"
+                                                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                                                               Text="{Binding AttemptedAtText}" />
+                                                                                    <TextBlock Margin="0,6,0,0"
+                                                                                               FontSize="13"
+                                                                                               Foreground="{Binding DetailBrush}"
+                                                                                               Text="{Binding DetailText}"
+                                                                                               TextWrapping="Wrap" />
+                                                                                </StackPanel>
+
+                                                                                <Button Grid.Column="4"
+                                                                                        Width="132"
+                                                                                        Style="{StaticResource DangerActionButtonStyle}"
+                                                                                        Click="DeleteTileButton_Click"
+                                                                                        Tag="{Binding}">
+                                                                                    <TextBlock HorizontalAlignment="Center"
+                                                                                               VerticalAlignment="Center"
+                                                                                               Text="删除单块" />
+                                                                                </Button>
+                                                                            </Grid>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+
+                                                            <Button Width="160"
+                                                                    HorizontalAlignment="Right"
+                                                                    Style="{StaticResource DangerActionButtonStyle}"
+                                                                    Click="DeleteBatchButton_Click"
+                                                                    Tag="{Binding}">
+                                                                <TextBlock HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           Text="删除这一批" />
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Expander>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <StackPanel HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasHistoryItems}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Border Width="92"
+                                            Height="92"
+                                            HorizontalAlignment="Center"
+                                            Background="{StaticResource PrimaryAccentSoftBrush}"
+                                            BorderBrush="#D5E3FB"
+                                            BorderThickness="1"
+                                            CornerRadius="26">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   FontSize="28"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                   Text="历史" />
+                                    </Border>
+                                    <TextBlock Margin="0,18,0,0"
+                                               HorizontalAlignment="Center"
+                                               FontSize="22"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource PrimaryTextBrush}"
+                                               Text="尚未固定历史" />
+                                    <TextBlock Margin="0,10,0,0"
+                                               Width="340"
+                                               HorizontalAlignment="Center"
+                                               FontSize="15"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="完成一次图片固定后，这里会按批次显示结果；展开后可以清理单块或整批。"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Margin="0,20,0,0"
+                            Padding="18"
+                            Background="{StaticResource InsetSurfaceBrush}"
+                            BorderBrush="{StaticResource InsetBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="24">
+                        <StackPanel>
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{Binding StatusBrush}"
+                                       Text="{Binding StatusText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0"
+                                       FontSize="13"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding StatusHintText}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

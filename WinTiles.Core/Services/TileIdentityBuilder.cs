@@ -4,7 +4,7 @@ public static class TileIdentityBuilder
 {
     public static string BuildAppUserModelId(string tileId) => $"WinTiles.Image.{tileId}";
 
-    public static string BuildShortcutDisplayTitle(string sourceImagePath)
+    public static string BuildBatchDisplayTitle(string sourceImagePath)
     {
         var baseName = Path.GetFileNameWithoutExtension(sourceImagePath);
         var safeName = string.Join(
@@ -16,9 +16,24 @@ public static class TileIdentityBuilder
             : safeName;
     }
 
-    public static string BuildShortcutFileName(string sourceImagePath, string tileId)
+    public static string BuildShortcutDisplayTitle(string sourceImagePath, int? gridRow = null, int? gridColumn = null)
     {
-        var safeName = BuildShortcutDisplayTitle(sourceImagePath);
+        var baseTitle = BuildBatchDisplayTitle(sourceImagePath);
+        if (!gridRow.HasValue || !gridColumn.HasValue)
+        {
+            return baseTitle;
+        }
+
+        return $"{baseTitle} {gridRow.Value + 1}-{gridColumn.Value + 1}";
+    }
+
+    public static string BuildShortcutFileName(
+        string sourceImagePath,
+        string tileId,
+        int? gridRow = null,
+        int? gridColumn = null)
+    {
+        var safeName = BuildShortcutDisplayTitle(sourceImagePath, gridRow, gridColumn);
 
         var suffix = tileId.Length >= 8 ? tileId[..8] : tileId;
         return $"{safeName}-{suffix}.lnk";
