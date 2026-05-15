@@ -17,7 +17,7 @@ public sealed class PinHelperResult
 
     public string? Warning { get; init; }
 
-    // 记录 helper 最终采用的身份来源，方便排查是 HostExe 生效还是 AppUserModelID 生效。
+    // 记录 helper 最终采用的固定身份，方便排查开始菜单究竟按哪条路径识别了这个磁贴。
     public string? IdentityKind { get; init; }
 
     public string? IdentityValue { get; init; }

@@ -64,6 +64,9 @@ public sealed class StartMenuShortcutService
 
             var persistFile = (IPersistFile)shellLink;
             persistFile.Save(shortcutPath, true);
+
+            // 快捷方式刚写入后，主动通知 shell 更新目录和项目，避免 AppsFolder 里还看不到新入口。
+            NotifyShellAboutShortcut(shortcutPath);
             return shortcutPath;
         }
         finally
@@ -104,6 +107,17 @@ public sealed class StartMenuShortcutService
     {
         using var propVariant = PROPVARIANT.FromString(value);
         propertyStore.SetValue(in key, in propVariant);
+    }
+
+    private static void NotifyShellAboutShortcut(string shortcutPath)
+    {
+        string? shortcutDirectory = Path.GetDirectoryName(shortcutPath);
+        if (!string.IsNullOrWhiteSpace(shortcutDirectory))
+        {
+            SHChangeNotify(ShcneUpdatedir, ShcnfPathW, shortcutDirectory, nint.Zero);
+        }
+
+        SHChangeNotify(ShcneUpdateitem, ShcnfPathW, shortcutPath, nint.Zero);
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -173,6 +187,13 @@ public sealed class StartMenuShortcutService
 
     [DllImport("ole32.dll")]
     private static extern int PropVariantClear(ref PROPVARIANT pvar);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern void SHChangeNotify(long wEventId, uint uFlags, string? dwItem1, nint dwItem2);
+
+    private const long ShcneUpdatedir = 0x00001000;
+    private const long ShcneUpdateitem = 0x00002000;
+    private const uint ShcnfPathW = 0x0005;
 
     [ComImport]
     [Guid("00021401-0000-0000-C000-000000000046")]

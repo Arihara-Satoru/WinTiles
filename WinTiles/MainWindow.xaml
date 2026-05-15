@@ -85,11 +85,6 @@
                 <StackPanel Grid.Row="1"
                             Margin="0,22,0,18"
                             Orientation="Horizontal">
-                    <RadioButton x:Name="Size1x1RadioButton"
-                                 Margin="0,0,18,0"
-                                 GroupName="TileSizeGroup"
-                                 Checked="SizeRadioButton_Checked"
-                                 Content="1x1" />
                     <RadioButton x:Name="Size2x2RadioButton"
                                  Margin="0,0,18,0"
                                  GroupName="TileSizeGroup"
@@ -97,14 +92,9 @@
                                  Content="2x2"
                                  IsChecked="True" />
                     <RadioButton x:Name="Size4x2RadioButton"
-                                 Margin="0,0,18,0"
                                  GroupName="TileSizeGroup"
                                  Checked="SizeRadioButton_Checked"
                                  Content="4x2" />
-                    <RadioButton x:Name="Size4x4RadioButton"
-                                 GroupName="TileSizeGroup"
-                                 Checked="SizeRadioButton_Checked"
-                                 Content="4x4（实验性）" />
                 </StackPanel>
 
                 <Border Grid.Row="2"

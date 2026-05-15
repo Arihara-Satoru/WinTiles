@@ -11,7 +11,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _previewTitle = "尚未选择图片";
     private BitmapImage? _previewImage;
     private bool _hasPreviewImage;
-    private string _statusText = "请选择一张图片，然后指定尺寸并固定。";
+    private string _statusText = "请选择一张图片，然后选择 2x2 或 4x2 并固定。";
     private Brush _statusBrush = Brushes.DarkSlateBlue;
     private string _availabilityMessage = "正在检查经典开始菜单状态…";
     private Brush _availabilityBrush = Brushes.DarkSlateBlue;

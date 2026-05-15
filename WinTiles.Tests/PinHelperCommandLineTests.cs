@@ -10,16 +10,14 @@ public sealed class PinHelperCommandLineTests
     {
         var commandLine = PinHelperCommandLine.BuildArguments(
             "abc123",
-            @"D:\Images\sample image.png",
             TileRequestSize.Wide4x2,
-            @"D:\WinTiles\WinTiles\bin\Debug\net8.0-windows\WinTiles.exe",
             @"D:\Tiles\abc123\TileHost.exe");
 
         Assert.Contains("pin-image", commandLine, StringComparison.Ordinal);
         Assert.Contains("--tile-id \"abc123\"", commandLine, StringComparison.Ordinal);
-        Assert.Contains("--image \"D:\\Images\\sample image.png\"", commandLine, StringComparison.Ordinal);
         Assert.Contains("--size \"4x2\"", commandLine, StringComparison.Ordinal);
-        Assert.Contains("--launch-target", commandLine, StringComparison.Ordinal);
         Assert.Contains("--host-exe \"D:\\Tiles\\abc123\\TileHost.exe\"", commandLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("--image", commandLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("--launch-target", commandLine, StringComparison.Ordinal);
     }
 }

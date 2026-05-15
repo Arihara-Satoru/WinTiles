@@ -65,7 +65,6 @@ public partial class App : Application
 
         return new WinTilesApplicationContext
         {
-            AppBaseDirectory = appBaseDirectory,
             MainExecutablePath = Environment.ProcessPath ?? Path.Combine(appBaseDirectory, "WinTiles.exe"),
             PinHelperPath = Path.Combine(toolsRoot, "WinTiles.PinHelper.exe"),
             TileHostTemplatePath = Path.Combine(toolsRoot, "TileHost.exe"),
@@ -75,6 +74,7 @@ public partial class App : Application
             VisualElementsManifestBuilder = new VisualElementsManifestBuilder(),
             TileHostConfigurationWriter = new TileHostConfigurationWriter(),
             StartMenuShortcutService = new StartMenuShortcutService(),
+            StartMenuPinVerbInvoker = new StartMenuPinVerbInvoker(),
             PinHelperInvoker = new PinHelperInvoker()
         };
     }

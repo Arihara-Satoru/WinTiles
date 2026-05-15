@@ -9,9 +9,7 @@ public sealed class PinHelperInvoker
     public async Task<PinHelperResult> PinImageAsync(
         string pinHelperPath,
         string tileId,
-        string imagePath,
         TileRequestSize requestedSize,
-        string launchTarget,
         string hostExePath,
         CancellationToken cancellationToken = default)
     {
@@ -28,7 +26,7 @@ public sealed class PinHelperInvoker
         var startInfo = new ProcessStartInfo
         {
             FileName = pinHelperPath,
-            Arguments = PinHelperCommandLine.BuildArguments(tileId, imagePath, requestedSize, launchTarget, hostExePath),
+            Arguments = PinHelperCommandLine.BuildArguments(tileId, requestedSize, hostExePath),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

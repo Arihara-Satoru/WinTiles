@@ -101,9 +101,7 @@ public partial class MainWindow : Window
         // XAML 初始化阶段单选按钮会依次触发 Checked，这里只根据当前 sender 判断，避免访问尚未构造完成的控件字段。
         _viewModel.SelectedSize = radioButton.Name switch
         {
-            nameof(Size1x1RadioButton) => TileRequestSize.Small1x1,
             nameof(Size4x2RadioButton) => TileRequestSize.Wide4x2,
-            nameof(Size4x4RadioButton) => TileRequestSize.Large4x4,
             _ => TileRequestSize.Medium2x2
         };
 
@@ -161,15 +159,23 @@ public partial class MainWindow : Window
 
             await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
 
-            var pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
-                _applicationContext.PinHelperPath,
-                tileId,
-                copiedSourcePath,
-                _viewModel.SelectedSize,
-                _applicationContext.MainExecutablePath,
-                hostExePath).ConfigureAwait(true);
+            // 先直接触发一次系统自己的“固定到开始屏幕”命令，尽量贴近用户手动右键固定的行为。
+            var shellPinResult = await _applicationContext.StartMenuPinVerbInvoker.TryPinAsync(
+                appUserModelId,
+                shortcutPath).ConfigureAwait(true);
 
-            var normalizedAttempt = NormalizePinAttempt(pinResult);
+            PinHelperResult? pinResult = null;
+            if (_viewModel.SelectedSize == TileRequestSize.Wide4x2 || !shellPinResult.Invoked)
+            {
+                // 4x2 仍需要内部接口补一次尺寸请求；如果系统固定命令没触发，也继续保留 helper 作为兜底。
+                pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
+                    _applicationContext.PinHelperPath,
+                    tileId,
+                    _viewModel.SelectedSize,
+                    hostExePath).ConfigureAwait(true);
+            }
+
+            var normalizedAttempt = NormalizePinAttempt(shellPinResult, pinResult, appUserModelId);
             await _applicationContext.TileRecordStore.SavePinAttemptAsync(tileId, normalizedAttempt).ConfigureAwait(true);
 
             SetStatus(normalizedAttempt.Message, MapStatusBrush(normalizedAttempt.Status));
@@ -234,33 +240,105 @@ public partial class MainWindow : Window
             manifestPath);
     }
 
-    private PinAttemptRecord NormalizePinAttempt(PinHelperResult pinResult)
+    private PinAttemptRecord NormalizePinAttempt(
+        StartMenuPinVerbResult shellPinResult,
+        PinHelperResult? pinResult,
+        string appUserModelId)
     {
-        var status = pinResult.Status;
-        var message = pinResult.Message;
-        var warning = pinResult.Warning;
-
-        if (_viewModel.SelectedSize.UsesExperimentalPinPath() && pinResult.Status == PinHelperResultStatus.Success)
+        if (shellPinResult.Invoked && pinResult is null)
         {
-            status = PinHelperResultStatus.Warning;
-            message = "已固定，但系统可能未按请求尺寸显示";
-            warning ??= $"{_viewModel.SelectedSize.ToDisplayText()} 仍走实验性固定路径，请手动确认开始菜单中的实际尺寸。";
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = _viewModel.SelectedSize,
+                Status = PinHelperResultStatus.Success,
+                Message = "已触发系统固定命令并请求固定为 2x2",
+                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}",
+                Warning = null,
+                IdentityKind = "AppUserModelID",
+                IdentityValue = appUserModelId
+            };
+        }
+
+        if (shellPinResult.Invoked && pinResult is not null)
+        {
+            var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
+            var status = pinResult.Status;
+            var message = pinResult.Message;
+
+            if (pinResult.Status == PinHelperResultStatus.Failure)
+            {
+                status = PinHelperResultStatus.Warning;
+                message = "已触发系统固定命令，但磁贴尺寸刷新失败，请检查开始菜单中的实际结果。";
+                warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
+            }
+
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = _viewModel.SelectedSize,
+                Status = status,
+                Message = message,
+                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}+{pinResult.PinMethod}",
+                Warning = warning,
+                IdentityKind = pinResult.IdentityKind,
+                IdentityValue = pinResult.IdentityValue,
+                ContainsBefore = pinResult.ContainsBefore,
+                ContainsAfterCommit = pinResult.ContainsAfterCommit,
+                ContainsAfterReopen = pinResult.ContainsAfterReopen
+            };
+        }
+
+        if (pinResult is not null)
+        {
+            var status = pinResult.Status;
+            var message = pinResult.Message;
+            var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
+
+            if (pinResult.Status == PinHelperResultStatus.Success)
+            {
+                status = PinHelperResultStatus.Warning;
+                message = "已写入内部固定请求，但系统自动固定命令未触发，请检查开始菜单中的实际结果。";
+                warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
+            }
+
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = _viewModel.SelectedSize,
+                Status = status,
+                Message = message,
+                PinMethod = pinResult.PinMethod,
+                Warning = warning,
+                IdentityKind = pinResult.IdentityKind,
+                IdentityValue = pinResult.IdentityValue,
+                ContainsBefore = pinResult.ContainsBefore,
+                ContainsAfterCommit = pinResult.ContainsAfterCommit,
+                ContainsAfterReopen = pinResult.ContainsAfterReopen
+            };
         }
 
         return new PinAttemptRecord
         {
             AttemptedAtUtc = DateTimeOffset.UtcNow,
             RequestedSize = _viewModel.SelectedSize,
-            Status = status,
-            Message = message,
-            PinMethod = pinResult.PinMethod,
-            Warning = warning,
-            IdentityKind = pinResult.IdentityKind,
-            IdentityValue = pinResult.IdentityValue,
-            ContainsBefore = pinResult.ContainsBefore,
-            ContainsAfterCommit = pinResult.ContainsAfterCommit,
-            ContainsAfterReopen = pinResult.ContainsAfterReopen
+            Status = PinHelperResultStatus.Failure,
+            Message = "未能触发系统固定命令。",
+            PinMethod = "ShellVerbUnavailable",
+            Warning = shellPinResult.ErrorMessage
         };
+    }
+
+    private static string? CombineWarnings(params string?[] messages)
+    {
+        var filteredMessages = messages
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        return filteredMessages.Length == 0
+            ? null
+            : string.Join(Environment.NewLine, filteredMessages);
     }
 
     private void RefreshEnvironmentState()
@@ -305,10 +383,8 @@ public partial class MainWindow : Window
     private void ApplySelectedSize(TileRequestSize size)
     {
         _viewModel.SelectedSize = size;
-        Size1x1RadioButton.IsChecked = size == TileRequestSize.Small1x1;
         Size2x2RadioButton.IsChecked = size == TileRequestSize.Medium2x2;
         Size4x2RadioButton.IsChecked = size == TileRequestSize.Wide4x2;
-        Size4x4RadioButton.IsChecked = size == TileRequestSize.Large4x4;
     }
 
     private void LoadPreviewImage(string imagePath)

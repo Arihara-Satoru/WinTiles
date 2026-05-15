@@ -113,6 +113,15 @@ namespace ABI::WindowsInternal::Shell::UnifiedTile::CuratedTileCollections
         virtual HRESULT STDMETHODCALLTYPE DeleteTile(GUID) = 0;
         virtual HRESULT STDMETHODCALLTYPE RemoveTile(GUID) = 0;
         virtual HRESULT STDMETHODCALLTYPE Commit() = 0;
+        virtual HRESULT STDMETHODCALLTYPE CommitAsync(ABI::Windows::Foundation::IAsyncAction**) = 0;
+        virtual HRESULT STDMETHODCALLTYPE CommitAsyncWithTimerBypass(ABI::Windows::Foundation::IAsyncAction**) = 0;
+        virtual HRESULT STDMETHODCALLTYPE ResetToDefault() = 0;
+        virtual HRESULT STDMETHODCALLTYPE ResetToDefaultAsync(ABI::Windows::Foundation::IAsyncAction**) = 0;
+        virtual HRESULT STDMETHODCALLTYPE CheckForUpdate() = 0;
+        virtual HRESULT STDMETHODCALLTYPE GetCustomProperty(HSTRING, HSTRING*) = 0;
+        virtual HRESULT STDMETHODCALLTYPE HasCustomProperty(HSTRING, BOOLEAN*) = 0;
+        virtual HRESULT STDMETHODCALLTYPE RemoveCustomProperty(HSTRING) = 0;
+        virtual HRESULT STDMETHODCALLTYPE SetCustomProperty(HSTRING, HSTRING) = 0;
     };
 
     MIDL_INTERFACE("adbf8965-6056-4126-ab26-6660af4661ce")
@@ -143,18 +152,14 @@ namespace ABI::WindowsInternal::Shell::UnifiedTile::CuratedTileCollections
 
 enum class RequestedSize
 {
-    Small1x1,
     Medium2x2,
-    Wide4x2,
-    Large4x4
+    Wide4x2
 };
 
 struct PinArguments
 {
     std::wstring tileId;
-    std::wstring imagePath;
     RequestedSize size = RequestedSize::Medium2x2;
-    std::wstring launchTarget;
     std::wstring hostExePath;
 };
 
@@ -260,19 +265,9 @@ static bool IsClassicModeEnabled()
 static RequestedSize ParseRequestedSize(const std::wstring& value)
 {
     const auto lowered = ToLowerCopy(value);
-    if (lowered == L"1x1")
-    {
-        return RequestedSize::Small1x1;
-    }
-
     if (lowered == L"4x2")
     {
         return RequestedSize::Wide4x2;
-    }
-
-    if (lowered == L"4x4")
-    {
-        return RequestedSize::Large4x4;
     }
 
     return RequestedSize::Medium2x2;
@@ -339,6 +334,68 @@ static HRESULT OpenStartTileCollection(
     return S_OK;
 }
 
+static HRESULT WaitForAsyncAction(ABI::Windows::Foundation::IAsyncAction* asyncAction, DWORD timeoutMilliseconds)
+{
+    using namespace ABI::Windows::Foundation;
+
+    if (!asyncAction)
+    {
+        return E_POINTER;
+    }
+
+    ComPtr<IAsyncInfo> asyncInfo;
+    RETURN_IF_FAILED_LOCAL(asyncAction->QueryInterface(IID_PPV_ARGS(&asyncInfo)));
+
+    DWORD elapsedMilliseconds = 0;
+    constexpr DWORD pollIntervalMilliseconds = 50;
+    while (true)
+    {
+        AsyncStatus status = Started;
+        RETURN_IF_FAILED_LOCAL(asyncInfo->get_Status(&status));
+
+        if (status == Completed)
+        {
+            return asyncAction->GetResults();
+        }
+
+        if (status == Error)
+        {
+            HRESULT errorCode = S_OK;
+            RETURN_IF_FAILED_LOCAL(asyncInfo->get_ErrorCode(&errorCode));
+            return errorCode;
+        }
+
+        if (status == Canceled)
+        {
+            return HRESULT_FROM_WIN32(ERROR_CANCELLED);
+        }
+
+        if (elapsedMilliseconds >= timeoutMilliseconds)
+        {
+            return HRESULT_FROM_WIN32(WAIT_TIMEOUT);
+        }
+
+        Sleep(pollIntervalMilliseconds);
+        elapsedMilliseconds += pollIntervalMilliseconds;
+    }
+}
+
+static void AppendWarning(PinResult& result, const std::wstring& message)
+{
+    if (message.empty())
+    {
+        return;
+    }
+
+    result.status = L"warning";
+    if (!result.warning.empty())
+    {
+        result.warning += L" ";
+    }
+
+    result.warning += message;
+}
+
 static HRESULT CheckContains(
     ABI::WindowsInternal::Shell::UnifiedTile::CuratedTileCollections::ICuratedTileCollection* tileCollection,
     ABI::WindowsInternal::Shell::UnifiedTile::IUnifiedTileIdentifier* unifiedTileIdentifier,
@@ -372,6 +429,46 @@ static HRESULT CreateUnifiedTileIdentifier(
     HString identityString;
     RETURN_IF_FAILED_LOCAL(identityString.Set(identityValue.c_str()));
     return win32Factory->Create(identityString.Get(), unifiedTileIdentifier);
+}
+
+static HRESULT CommitTileCollection(
+    ABI::WindowsInternal::Shell::UnifiedTile::CuratedTileCollections::ICuratedTileCollection* tileCollection,
+    PinResult& result)
+{
+    using namespace ABI::Windows::Foundation;
+    using namespace ABI::WindowsInternal::Shell::UnifiedTile::CuratedTileCollections;
+
+    if (!tileCollection)
+    {
+        return E_POINTER;
+    }
+
+    HRESULT hr = tileCollection->Commit();
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    ComPtr<IAsyncAction> asyncAction;
+    hr = tileCollection->CommitAsyncWithTimerBypass(&asyncAction);
+    if (FAILED(hr))
+    {
+        hr = tileCollection->CommitAsync(&asyncAction);
+    }
+
+    if (FAILED(hr))
+    {
+        AppendWarning(result, L"未能触发额外的 Start.TileGrid 刷新。");
+        return S_OK;
+    }
+
+    hr = WaitForAsyncAction(asyncAction.Get(), 5000);
+    if (FAILED(hr))
+    {
+        AppendWarning(result, L"Start.TileGrid 异步刷新未确认完成：" + FormatHResult(hr));
+    }
+
+    return S_OK;
 }
 
 static PinResult ExecutePinForShortcutTile(
@@ -440,16 +537,7 @@ static PinResult ExecutePinForShortcutTile(
         return failure;
     }
 
-    result.pinMethod = L"PinToStart.Tile2x2";
-    result.message = L"已请求固定为 2x2";
-
-    if (arguments.size == RequestedSize::Medium2x2)
-    {
-        hr = startTileCollection->PinToStart(pinUnifiedTileIdentifier.Get(), TilePinSize_Tile2x2);
-        result.pinMethod = L"PinToStart.Tile2x2";
-        result.message = L"已请求固定为 2x2";
-    }
-    else if (arguments.size == RequestedSize::Wide4x2)
+    if (arguments.size == RequestedSize::Wide4x2)
     {
         hr = startTileCollection->PinToStart(pinUnifiedTileIdentifier.Get(), TilePinSize_Tile4x2);
         result.pinMethod = L"PinToStart.Tile4x2";
@@ -457,32 +545,9 @@ static PinResult ExecutePinForShortcutTile(
     }
     else
     {
-        ABI::Windows::Foundation::Point location = { 0.0f, 0.0f };
-        ABI::Windows::Foundation::Size requestedGridSize =
-            arguments.size == RequestedSize::Small1x1
-            ? ABI::Windows::Foundation::Size{ 1.0f, 1.0f }
-            : ABI::Windows::Foundation::Size{ 4.0f, 4.0f };
-
-        hr = startTileCollection->PinToStartAtLocation(
-            pinUnifiedTileIdentifier.Get(),
-            nullptr,
-            location,
-            requestedGridSize);
-
-        result.status = L"warning";
-        result.pinMethod = arguments.size == RequestedSize::Small1x1
-            ? L"PinToStartAtLocation.1x1"
-            : L"PinToStartAtLocation.4x4";
-        result.message = L"已固定，但系统可能未按请求尺寸显示";
-        result.warning = arguments.size == RequestedSize::Small1x1
-            ? L"1x1 仍走实验性固定路径，请手动确认开始菜单中的实际尺寸。"
-            : L"4x4 仍走实验性固定路径，请手动确认开始菜单中的实际尺寸。";
-
-        if (FAILED(hr))
-        {
-            result.warning += L" PinToStartAtLocation 调用失败：" + FormatHResult(hr);
-            return result;
-        }
+        hr = startTileCollection->PinToStart(pinUnifiedTileIdentifier.Get(), TilePinSize_Tile2x2);
+        result.pinMethod = L"PinToStart.Tile2x2";
+        result.message = L"已请求固定为 2x2";
     }
 
     if (FAILED(hr))
@@ -494,22 +559,14 @@ static PinResult ExecutePinForShortcutTile(
         return failure;
     }
 
-    hr = tileCollection->Commit();
+    hr = CommitTileCollection(tileCollection.Get(), result);
     if (FAILED(hr))
     {
-        if (arguments.size == RequestedSize::Small1x1 || arguments.size == RequestedSize::Large4x4)
-        {
-            result.status = L"warning";
-            result.warning += (result.warning.empty() ? L"" : L" ") + std::wstring(L"Commit 失败：") + FormatHResult(hr);
-        }
-        else
-        {
-            auto failure = CreateFailureResult(L"提交 Start.TileGrid 失败：" + FormatHResult(hr), result.pinMethod);
-            failure.identityKind = pinIdentityKind;
-            failure.identityValue = pinIdentityValue;
-            failure.containsBefore = result.containsBefore;
-            return failure;
-        }
+        auto failure = CreateFailureResult(L"提交 Start.TileGrid 失败：" + FormatHResult(hr), result.pinMethod);
+        failure.identityKind = pinIdentityKind;
+        failure.identityValue = pinIdentityValue;
+        failure.containsBefore = result.containsBefore;
+        return failure;
     }
 
     if (SUCCEEDED(CheckContains(tileCollection.Get(), probeUnifiedTileIdentifier.Get(), &contains)))
@@ -594,14 +651,10 @@ static PinResult PinTile(const PinArguments& arguments)
 
     const auto appUserModelId = BuildAppUserModelId(arguments.tileId);
 
-    // 这里按尺寸分流身份来源：
-    // 1. 2x2 当前已经在用户机器上验证为稳定，继续走 AppUserModelID。
-    // 2. 4x2 在这套 ExplorerPatcher 经典开始菜单环境里会出现 AppID ghost-success：
-    //    Start.TileGrid 里看起来包含了磁贴，但 UI 里并没有真正显示出来。
-    //    之前最强的现场信号是壳层实际识别的身份更接近 HostExe，因此 4x2 单独切回 HostExe。
+    // 4x2 在经典开始菜单里更容易和 HostExe 对齐；2x2 则继续保留原来的 AppUserModelID 路径。
     const auto useHostExeIdentity = arguments.size == RequestedSize::Wide4x2;
-    const auto& pinIdentityKind = useHostExeIdentity ? std::wstring(L"HostExe") : std::wstring(L"AppUserModelID");
-    const auto& pinIdentityValue = useHostExeIdentity ? arguments.hostExePath : appUserModelId;
+    const std::wstring pinIdentityKind = useHostExeIdentity ? L"HostExe" : L"AppUserModelID";
+    const std::wstring pinIdentityValue = useHostExeIdentity ? arguments.hostExePath : appUserModelId;
     auto pinResult = ExecutePinForShortcutTile(
         arguments,
         userPinHelper.Get(),
@@ -635,21 +688,18 @@ static bool TryParseArguments(int argc, wchar_t** argv, PinArguments& arguments)
         {
             arguments.tileId = value;
         }
-        else if (key == L"--image")
-        {
-            arguments.imagePath = value;
-        }
         else if (key == L"--size")
         {
             arguments.size = ParseRequestedSize(value);
         }
-        else if (key == L"--launch-target")
-        {
-            arguments.launchTarget = value;
-        }
         else if (key == L"--host-exe")
         {
             arguments.hostExePath = value;
+        }
+        else if (key == L"--image" || key == L"--launch-target")
+        {
+            // 兼容旧版前端仍然传这些参数，但 helper 本身已经不再依赖它们。
+            continue;
         }
         else
         {
@@ -658,8 +708,6 @@ static bool TryParseArguments(int argc, wchar_t** argv, PinArguments& arguments)
     }
 
     return !arguments.tileId.empty() &&
-        !arguments.imagePath.empty() &&
-        !arguments.launchTarget.empty() &&
         !arguments.hostExePath.empty();
 }
 

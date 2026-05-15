@@ -4,8 +4,6 @@ namespace WinTiles;
 
 public sealed class WinTilesApplicationContext
 {
-    public required string AppBaseDirectory { get; init; }
-
     public required string MainExecutablePath { get; init; }
 
     public required string PinHelperPath { get; init; }
@@ -23,6 +21,8 @@ public sealed class WinTilesApplicationContext
     public required TileHostConfigurationWriter TileHostConfigurationWriter { get; init; }
 
     public required StartMenuShortcutService StartMenuShortcutService { get; init; }
+
+    public required StartMenuPinVerbInvoker StartMenuPinVerbInvoker { get; init; }
 
     public required PinHelperInvoker PinHelperInvoker { get; init; }
 }
