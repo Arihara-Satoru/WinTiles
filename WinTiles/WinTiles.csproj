@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- 让生成出的 WinTiles.exe 使用项目内这份统一图标。 -->
+    <ApplicationIcon>Assets\WinTiles.ico</ApplicationIcon>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>false</SelfContained>
@@ -13,6 +15,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WinTiles.Core\WinTiles.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 同时把图标嵌入 WPF 资源，供窗口标题栏和任务栏直接引用。 -->
+    <Resource Include="Assets\WinTiles.ico" />
   </ItemGroup>
 
   <ItemGroup>

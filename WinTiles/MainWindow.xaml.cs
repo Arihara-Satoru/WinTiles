@@ -15,7 +15,8 @@ namespace WinTiles;
 
 public partial class MainWindow : Window
 {
-    private const float CropCellGap = 16f;
+    // 继续收紧裁切格子之间的留白，让右侧网格更贴合预览拼图的观感。
+    private const float CropCellGap = 6f;
     private const float ZoomStep = 1.10f;
     private const double DragThreshold = 4d;
 

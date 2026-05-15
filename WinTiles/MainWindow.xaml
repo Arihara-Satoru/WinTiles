@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="WinTiles"
+        Icon="Assets/WinTiles.ico"
         Width="1512"
         Height="1018"
         MinWidth="1280"
@@ -122,130 +123,33 @@
 
                     <StackPanel Grid.Row="1"
                                 Margin="0,30,0,0">
+                        <!-- 左侧主操作改成纯文字按钮，减少图标带来的视觉重量差异。 -->
                         <Button x:Name="SelectImageButton"
                                 Style="{StaticResource PrimaryActionButtonStyle}"
                                 Click="SelectImageButton_Click">
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center">
-                                <Border Width="32"
-                                        Height="32"
-                                        Margin="0,0,12,0"
-                                        Background="#FFFFFF26"
-                                        BorderBrush="#FFFFFF66"
-                                        BorderThickness="1"
-                                        CornerRadius="10">
-                                    <Viewbox Margin="6">
-                                        <Canvas Width="24"
-                                                Height="24">
-                                            <Rectangle Width="19"
-                                                       Height="14"
-                                                       Canvas.Left="2.5"
-                                                       Canvas.Top="4.5"
-                                                       RadiusX="2.8"
-                                                       RadiusY="2.8"
-                                                       Stroke="#FFFFFFFF"
-                                                       StrokeThickness="1.5"
-                                                       Fill="Transparent" />
-                                            <Ellipse Width="3"
-                                                     Height="3"
-                                                     Canvas.Left="6"
-                                                     Canvas.Top="7"
-                                                     Fill="#FFFFFFFF" />
-                                            <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
-                                                      Stroke="#FFFFFFFF"
-                                                      StrokeThickness="1.8"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round"
-                                                      StrokeLineJoin="Round" />
-                                        </Canvas>
-                                    </Viewbox>
-                                </Border>
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="选择图片" />
-                            </StackPanel>
+                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                       Text="选择图片" />
                         </Button>
 
                         <Button x:Name="PinImageButton"
                                 Style="{StaticResource SecondaryActionButtonStyle}"
                                 Click="PinImageButton_Click"
                                 IsEnabled="{Binding CanPinImage}">
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Center">
-                                <Border Width="30"
-                                        Height="30"
-                                        Margin="0,0,12,0"
-                                        Background="{StaticResource PrimaryAccentSoftBrush}"
-                                        BorderBrush="#D4E4FF"
-                                        BorderThickness="1"
-                                        CornerRadius="10">
-                                    <Viewbox Margin="5">
-                                        <Canvas Width="24"
-                                                Height="24">
-                                            <Ellipse Width="7"
-                                                     Height="7"
-                                                     Canvas.Left="8.5"
-                                                     Canvas.Top="1.5"
-                                                     Fill="{StaticResource PrimaryAccentBrush}" />
-                                            <Rectangle Width="3"
-                                                       Height="13"
-                                                       Canvas.Left="10.5"
-                                                       Canvas.Top="6"
-                                                       Fill="{StaticResource PrimaryAccentBrush}"
-                                                       RenderTransformOrigin="0.5,0.5">
-                                                <Rectangle.RenderTransform>
-                                                    <RotateTransform Angle="35" CenterX="1.5" CenterY="6.5" />
-                                                </Rectangle.RenderTransform>
-                                            </Rectangle>
-                                            <Rectangle Width="2.5"
-                                                       Height="8"
-                                                       Canvas.Left="5.5"
-                                                       Canvas.Top="13"
-                                                       Fill="{StaticResource PrimaryAccentBrush}"
-                                                       RenderTransformOrigin="0.5,0.5">
-                                                <Rectangle.RenderTransform>
-                                                    <RotateTransform Angle="35" CenterX="1.25" CenterY="4" />
-                                                </Rectangle.RenderTransform>
-                                            </Rectangle>
-                                        </Canvas>
-                                    </Viewbox>
-                                </Border>
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="固定图片" />
-                            </StackPanel>
+                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                       Text="固定图片" />
                         </Button>
 
                         <Button x:Name="ShowHistoryButton"
                                 Style="{StaticResource SecondaryActionButtonStyle}"
                                 Click="ShowHistoryButton_Click"
                                 IsEnabled="{Binding CanOpenHistory}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                           Text="固定历史" />
 
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Center">
-                                    <Border Width="30"
-                                            Height="30"
-                                            Margin="0,0,12,0"
-                                            Background="{StaticResource PrimaryAccentSoftBrush}"
-                                            BorderBrush="#D4E4FF"
-                                            BorderThickness="1"
-                                            CornerRadius="10">
-                                        <TextBlock HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{StaticResource PrimaryAccentBrush}"
-                                                   Text="历" />
-                                    </Border>
-                                    <TextBlock VerticalAlignment="Center"
-                                               Text="固定历史" />
-                                </StackPanel>
-
-                                <Border Grid.Column="1"
-                                        Margin="16,0,0,0"
+                                <Border Margin="12,0,0,0"
                                         Padding="10,6"
                                         VerticalAlignment="Center"
                                         Background="{StaticResource PrimaryAccentSoftBrush}"
@@ -257,7 +161,7 @@
                                                Foreground="{StaticResource PrimaryAccentBrush}"
                                                Text="{Binding HistoryCountText}" />
                                 </Border>
-                            </Grid>
+                            </StackPanel>
                         </Button>
                     </StackPanel>
 
@@ -298,11 +202,6 @@
                         </Grid.RowDefinitions>
 
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
                             <StackPanel>
                                 <TextBlock FontSize="26"
                                            FontWeight="SemiBold"
@@ -314,19 +213,6 @@
                                            Text="{Binding CropSubtitle}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
-
-                            <Border Grid.Column="1"
-                                    Margin="18,2,0,0"
-                                    Padding="12,8"
-                                    Background="{StaticResource PrimaryAccentSoftBrush}"
-                                    BorderBrush="#D6E4FB"
-                                    BorderThickness="1"
-                                    CornerRadius="999">
-                                <TextBlock FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource PrimaryAccentBrush}"
-                                           Text="{Binding ZoomText}" />
-                            </Border>
                         </Grid>
 
                         <Grid x:Name="CropBoardHost"
@@ -341,7 +227,7 @@
                                     Background="#EEF5FD"
                                     BorderBrush="#D5E1F0"
                                     BorderThickness="1"
-                                    CornerRadius="30"
+                                    CornerRadius="0"
                                     ClipToBounds="True"
                                     Cursor="SizeAll"
                                     MouseLeftButtonDown="CropBoardBorder_MouseLeftButtonDown"
@@ -385,8 +271,8 @@
                                                 <Grid Width="{Binding Size}"
                                                       Height="{Binding Size}">
                                                     <Rectangle x:Name="InactiveCell"
-                                                               RadiusX="22"
-                                                               RadiusY="22"
+                                                               RadiusX="0"
+                                                               RadiusY="0"
                                                                Fill="#F9FCFFDD"
                                                                Stroke="#C9D8EC"
                                                                StrokeThickness="1.5"
@@ -395,7 +281,7 @@
                                                             Background="#182F7DFF"
                                                             BorderBrush="#6BA7FF"
                                                             BorderThickness="2"
-                                                            CornerRadius="22"
+                                                            CornerRadius="0"
                                                             Visibility="Collapsed" />
                                                     <TextBlock x:Name="PlusText"
                                                                HorizontalAlignment="Center"
@@ -586,8 +472,7 @@
                                         Margin="0,0,12,0"
                                         Style="{StaticResource SecondaryActionButtonStyle}"
                                         Click="BackToCropButton_Click">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
+                                    <TextBlock Style="{StaticResource ActionButtonTextStyle}"
                                                Text="返回裁切" />
                                 </Button>
                                 <Button x:Name="OpenRecordFolderButton"
@@ -596,17 +481,17 @@
                                         Style="{StaticResource SecondaryActionButtonStyle}"
                                         Click="OpenRecordFolderButton_Click"
                                         IsEnabled="{Binding CanOpenRecordFolder}">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
+                                    <TextBlock Style="{StaticResource ActionButtonTextStyle}"
                                                Text="打开记录目录" />
                                 </Button>
                                 <Button x:Name="ClearAllPinnedTilesButton"
                                         Width="176"
+                                        MinHeight="64"
+                                        Padding="18,16"
                                         Style="{StaticResource DangerActionButtonStyle}"
                                         Click="ClearAllPinnedTilesButton_Click"
                                         IsEnabled="{Binding CanClearAllPinnedTiles}">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
+                                    <TextBlock Style="{StaticResource ActionButtonTextStyle}"
                                                Text="清除全部固定" />
                                 </Button>
                             </StackPanel>
