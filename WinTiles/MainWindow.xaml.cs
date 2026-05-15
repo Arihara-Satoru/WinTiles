@@ -3,43 +3,59 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using WinTiles.Core.Models;
 using WinTiles.Core.Services;
+using DrawingPointF = System.Drawing.PointF;
+using DrawingSizeF = System.Drawing.SizeF;
 
 namespace WinTiles;
 
 public partial class MainWindow : Window
 {
+    private const float CropCellGap = 16f;
+    private const float ZoomStep = 1.10f;
+    private const double DragThreshold = 4d;
+
     private readonly WinTilesApplicationContext _applicationContext;
     private readonly MainWindowViewModel _viewModel;
+    private readonly CropLayoutCalculator _cropLayoutCalculator;
+
     private string? _selectedImagePath;
-    private TileHistoryItemViewModel? _selectedHistoryItem;
-    private bool _isRefreshingHistory;
+    private DrawingSizeF _selectedImagePixelSize;
+    private Point? _dragStartPoint;
+    private DrawingPointF _dragStartOffset;
+    private bool _isDraggingCropImage;
 
     public MainWindow(WinTilesApplicationContext applicationContext)
     {
         _applicationContext = applicationContext;
+        _cropLayoutCalculator = applicationContext.CropLayoutCalculator;
         _viewModel = new MainWindowViewModel();
+
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.RecordLocationText = _applicationContext.TileRecordStore.RootDirectory;
+
+        InitializeCropCells();
     }
 
     public async Task InitializeAsync(string? startupTileId)
     {
         RefreshEnvironmentState();
-        ResetDefaultTileSize();
+        ApplyPanelMode(MainPanelMode.Crop);
+        UpdateSelectionSummary();
         RefreshActionButtonsState();
+
+        await RefreshHistoryAsync(startupTileId).ConfigureAwait(true);
+        UpdateCropBoardLayout();
 
         if (!string.IsNullOrWhiteSpace(startupTileId))
         {
             await HandleActivationAsync(startupTileId).ConfigureAwait(true);
-            return;
         }
-
-        await RefreshHistoryAsync().ConfigureAwait(true);
     }
 
     public async Task HandleActivationAsync(string? tileId)
@@ -59,15 +75,12 @@ public partial class MainWindow : Window
         if (tileRecord is null)
         {
             SetStatus("已打开 WinTiles，但没有找到对应的磁贴记录。", Brushes.DarkGoldenrod);
-            await RefreshHistoryAsync().ConfigureAwait(true);
-            RefreshActionButtonsState();
             return;
         }
 
-        _selectedImagePath = null;
+        ApplyPanelMode(MainPanelMode.History);
         await RefreshHistoryAsync(tileId).ConfigureAwait(true);
-
-        RefreshActionButtonsState();
+        SetStatus($"已定位到磁贴记录：{ResolveTilePositionText(tileRecord)}", Brushes.DarkSlateBlue);
     }
 
     private void SelectImageButton_Click(object sender, RoutedEventArgs e)
@@ -84,14 +97,13 @@ public partial class MainWindow : Window
         }
 
         _selectedImagePath = openFileDialog.FileName;
-        _selectedHistoryItem = null;
-        if (HistoryListBox is not null)
-        {
-            HistoryListBox.SelectedItem = null;
-        }
+        ApplyPanelMode(MainPanelMode.Crop);
+        LoadSelectedImage(openFileDialog.FileName);
+    }
 
-        ShowCurrentImagePreview(openFileDialog.FileName);
-        RefreshActionButtonsState();
+    private async void ShowHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ShowHistoryAsync().ConfigureAwait(true);
     }
 
     private async void PinImageButton_Click(object sender, RoutedEventArgs e)
@@ -99,21 +111,55 @@ public partial class MainWindow : Window
         await PinCurrentImageAsync().ConfigureAwait(true);
     }
 
-    private async void ClearPinButton_Click(object sender, RoutedEventArgs e)
+    private void BackToCropButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyPanelMode(MainPanelMode.Crop);
+    }
+
+    private void ClearCropSelectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var cell in _viewModel.CropCells)
+        {
+            cell.IsSelected = false;
+            cell.SelectionOrderText = string.Empty;
+        }
+
+        UpdateSelectionSummary();
+        ResetCropTransform();
+        SetStatus("已清空所有裁切区域。", Brushes.DarkSlateBlue);
+        RefreshActionButtonsState();
+    }
+
+    private async void ClearAllPinnedTilesButton_Click(object sender, RoutedEventArgs e)
     {
         await ClearAllPinnedTilesAsync().ConfigureAwait(true);
     }
 
-    private async void DeleteSelectedHistoryButton_Click(object sender, RoutedEventArgs e)
+    private async void DeleteTileButton_Click(object sender, RoutedEventArgs e)
     {
-        await DeleteSelectedHistoryAsync().ConfigureAwait(true);
+        if (sender is not Button { Tag: TileHistoryItemViewModel historyItem })
+        {
+            return;
+        }
+
+        await DeleteSingleTileAsync(historyItem).ConfigureAwait(true);
+    }
+
+    private async void DeleteBatchButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: TileBatchHistoryItemViewModel historyItem })
+        {
+            return;
+        }
+
+        await DeleteBatchAsync(historyItem).ConfigureAwait(true);
     }
 
     private void OpenRecordFolderButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            // 让用户直接跳到本地记录目录，方便检查固定后的磁贴记录和清理结果。
+            // 让用户直接跳到本地记录目录，方便检查固定后的磁贴记录和批次目录。
             Process.Start(new ProcessStartInfo
             {
                 FileName = _applicationContext.TileRecordStore.RootDirectory,
@@ -127,11 +173,149 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CropBoardHost_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateCropBoardLayout();
+    }
+
+    private void CropBoardBorder_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!_viewModel.HasCropImage || _selectedImagePixelSize.Width <= 0 || _selectedImagePixelSize.Height <= 0)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        var activeCells = GetActiveCells();
+        var boardSize = GetCropBoardSize();
+        var minimumScale = _cropLayoutCalculator.CalculateMinimumScale(
+            _selectedImagePixelSize,
+            boardSize,
+            CropCellGap,
+            activeCells);
+        var currentScale = (float)_viewModel.CropScale;
+        var wheelFactor = e.Delta > 0 ? ZoomStep : 1f / ZoomStep;
+        var desiredScale = currentScale * wheelFactor;
+        desiredScale = Math.Max(desiredScale, minimumScale);
+        desiredScale = _cropLayoutCalculator.SnapScaleToMinimum(desiredScale, minimumScale);
+
+        var pointer = e.GetPosition(CropBoardBorder);
+        var currentOffset = new DrawingPointF((float)_viewModel.CropOffsetX, (float)_viewModel.CropOffsetY);
+        var nextOffset = new DrawingPointF(
+            (float)(pointer.X - (pointer.X - currentOffset.X) * (desiredScale / currentScale)),
+            (float)(pointer.Y - (pointer.Y - currentOffset.Y) * (desiredScale / currentScale)));
+
+        nextOffset = _cropLayoutCalculator.ClampOffset(
+            _selectedImagePixelSize,
+            desiredScale,
+            boardSize,
+            CropCellGap,
+            activeCells,
+            nextOffset);
+
+        ApplyCropState(desiredScale, nextOffset, minimumScale);
+    }
+
+    private void CropBoardBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (CropBoardBorder is null)
+        {
+            return;
+        }
+
+        _dragStartPoint = e.GetPosition(CropBoardBorder);
+        _dragStartOffset = new DrawingPointF((float)_viewModel.CropOffsetX, (float)_viewModel.CropOffsetY);
+        _isDraggingCropImage = false;
+        CropBoardBorder.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void CropBoardBorder_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragStartPoint is null || CropBoardBorder is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        if (!_viewModel.HasCropImage || _selectedImagePixelSize.Width <= 0 || _selectedImagePixelSize.Height <= 0)
+        {
+            return;
+        }
+
+        var currentPoint = e.GetPosition(CropBoardBorder);
+        var delta = currentPoint - _dragStartPoint.Value;
+        if (!_isDraggingCropImage && delta.Length < DragThreshold)
+        {
+            return;
+        }
+
+        _isDraggingCropImage = true;
+
+        var boardSize = GetCropBoardSize();
+        var activeCells = GetActiveCells();
+        var desiredOffset = new DrawingPointF(
+            _dragStartOffset.X + (float)delta.X,
+            _dragStartOffset.Y + (float)delta.Y);
+        var clampedOffset = _cropLayoutCalculator.ClampOffset(
+            _selectedImagePixelSize,
+            (float)_viewModel.CropScale,
+            boardSize,
+            CropCellGap,
+            activeCells,
+            desiredOffset);
+
+        ApplyCropState((float)_viewModel.CropScale, clampedOffset, (float)_viewModel.MinimumCropScale);
+    }
+
+    private void CropBoardBorder_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_dragStartPoint is null || CropBoardBorder is null)
+        {
+            return;
+        }
+
+        var releasePoint = e.GetPosition(CropBoardBorder);
+        CropBoardBorder.ReleaseMouseCapture();
+
+        if (!_isDraggingCropImage)
+        {
+            ToggleCellAtPoint(releasePoint);
+        }
+
+        _dragStartPoint = null;
+        _isDraggingCropImage = false;
+        e.Handled = true;
+    }
+
+    private void CropBoardBorder_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (CropBoardBorder is not null && CropBoardBorder.IsMouseCaptured && e.LeftButton == MouseButtonState.Released)
+        {
+            CropBoardBorder.ReleaseMouseCapture();
+            _dragStartPoint = null;
+            _isDraggingCropImage = false;
+        }
+    }
+
+    private async Task ShowHistoryAsync(string? preferredTileId = null)
+    {
+        ApplyPanelMode(MainPanelMode.History);
+        await RefreshHistoryAsync(preferredTileId).ConfigureAwait(true);
+    }
+
     private async Task PinCurrentImageAsync()
     {
         if (string.IsNullOrWhiteSpace(_selectedImagePath))
         {
             MessageBox.Show(this, "请先选择一张图片。", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var activeCells = GetActiveCells();
+        if (activeCells.Count == 0)
+        {
+            MessageBox.Show(this, "请先点击右侧网格，至少启用一个裁切区域。", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -147,72 +331,180 @@ public partial class MainWindow : Window
             _viewModel.IsBusy = true;
             RefreshActionButtonsState();
 
-            var tileId = Guid.NewGuid().ToString("N");
-            var tileDirectory = _applicationContext.TileRecordStore.CreateTileDirectory(tileId);
-            var sourceExtension = Path.GetExtension(_selectedImagePath);
-            var copiedSourcePath = Path.Combine(tileDirectory, $"Source{sourceExtension}");
-            File.Copy(_selectedImagePath, copiedSourcePath, overwrite: true);
+            var batchId = Guid.NewGuid().ToString("N");
+            var batchDirectory = _applicationContext.TileRecordStore.CreateBatchDirectory(batchId);
+            var copiedSourcePath = CopySourceImageToBatchDirectory(batchDirectory, _selectedImagePath);
+            var exportRegions = _cropLayoutCalculator.BuildExportRegions(
+                _selectedImagePixelSize,
+                GetCropBoardSize(),
+                CropCellGap,
+                activeCells,
+                (float)_viewModel.CropScale,
+                new DrawingPointF((float)_viewModel.CropOffsetX, (float)_viewModel.CropOffsetY));
 
-            var assetsDirectory = Path.Combine(tileDirectory, "Assets");
-            var generatedAssetSet = _applicationContext.ImageAssetGenerator.GenerateAssets(copiedSourcePath, assetsDirectory);
+            var batchTileIds = new List<string>(exportRegions.Count);
+            var successCount = 0;
+            var warningCount = 0;
+            var failureCount = 0;
+            var detailMessages = new List<string>();
 
-            var hostExePath = PrepareTileHost(tileDirectory, tileId);
-            var manifestPath = Path.Combine(tileDirectory, "TileHost.VisualElementsManifest.xml");
-            File.WriteAllText(
-                manifestPath,
-                _applicationContext.VisualElementsManifestBuilder.Build());
-
-            var appUserModelId = TileIdentityBuilder.BuildAppUserModelId(tileId);
-            var shortcutDisplayTitle = TileIdentityBuilder.BuildShortcutDisplayTitle(_selectedImagePath!);
-            var shortcutPath = CreateStartMenuShortcut(
-                tileId,
-                hostExePath,
-                appUserModelId,
-                generatedAssetSet.ShortcutIconPath,
-                manifestPath,
-                shortcutDisplayTitle);
-
-            var tileRecord = new TileRecord
+            foreach (var exportRegion in exportRegions)
             {
-                TileId = tileId,
+                var tileId = Guid.NewGuid().ToString("N");
+                var tileDirectory = _applicationContext.TileRecordStore.CreateTileDirectory(tileId);
+                var assetsDirectory = Path.Combine(tileDirectory, "Assets");
+                var hostExePath = Path.Combine(tileDirectory, "TileHost.exe");
+                var manifestPath = Path.Combine(tileDirectory, "TileHost.VisualElementsManifest.xml");
+                var appUserModelId = TileIdentityBuilder.BuildAppUserModelId(tileId);
+                var shortcutDisplayTitle = TileIdentityBuilder.BuildShortcutDisplayTitle(
+                    copiedSourcePath,
+                    exportRegion.GridRow,
+                    exportRegion.GridColumn);
+                var predictedShortcutPath = BuildStartMenuShortcutPath(
+                    copiedSourcePath,
+                    tileId,
+                    exportRegion.GridRow,
+                    exportRegion.GridColumn);
+
+                GeneratedAssetSet? generatedAssetSet = null;
+                TileRecord? tileRecord = null;
+                PinAttemptRecord attemptRecord;
+
+                try
+                {
+                    generatedAssetSet = _applicationContext.ImageAssetGenerator.GenerateAssets(
+                        copiedSourcePath,
+                        assetsDirectory,
+                        exportRegion.SourceCropBounds);
+
+                    var preparedHostExePath = PrepareTileHost(tileDirectory, tileId);
+                    File.WriteAllText(
+                        manifestPath,
+                        _applicationContext.VisualElementsManifestBuilder.Build());
+
+                    var shortcutPath = CreateStartMenuShortcut(
+                        copiedSourcePath,
+                        tileId,
+                        preparedHostExePath,
+                        appUserModelId,
+                        generatedAssetSet.ShortcutIconPath,
+                        manifestPath,
+                        shortcutDisplayTitle,
+                        exportRegion.GridRow,
+                        exportRegion.GridColumn);
+
+                    tileRecord = new TileRecord
+                    {
+                        TileId = tileId,
+                        SourceImagePath = copiedSourcePath,
+                        BatchId = batchId,
+                        TileIndex = exportRegion.TileIndex,
+                        GridRow = exportRegion.GridRow,
+                        GridColumn = exportRegion.GridColumn,
+                        PreviewImagePath = generatedAssetSet.Square310x310LogoPath,
+                        RequestedSize = TileRequestSize.Medium2x2,
+                        HostExePath = preparedHostExePath,
+                        ShortcutPath = shortcutPath,
+                        AssetsVersion = generatedAssetSet.AssetsVersion
+                    };
+
+                    await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
+
+                    // 先保留系统入口作为兼容探测，真正的自动固定仍统一交给 helper。
+                    var shellPinResult = await _applicationContext.StartMenuPinVerbInvoker.TryPinAsync(
+                        appUserModelId,
+                        shortcutPath).ConfigureAwait(true);
+
+                    var pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
+                        _applicationContext.PinHelperPath,
+                        tileId,
+                        TileRequestSize.Medium2x2,
+                        preparedHostExePath).ConfigureAwait(true);
+
+                    attemptRecord = NormalizePinAttempt(shellPinResult, pinResult, appUserModelId);
+                }
+                catch (Exception exception)
+                {
+                    tileRecord ??= new TileRecord
+                    {
+                        TileId = tileId,
+                        SourceImagePath = copiedSourcePath,
+                        BatchId = batchId,
+                        TileIndex = exportRegion.TileIndex,
+                        GridRow = exportRegion.GridRow,
+                        GridColumn = exportRegion.GridColumn,
+                        PreviewImagePath = generatedAssetSet?.Square310x310LogoPath ?? Path.Combine(assetsDirectory, "Square310x310Logo.png"),
+                        RequestedSize = TileRequestSize.Medium2x2,
+                        HostExePath = hostExePath,
+                        ShortcutPath = predictedShortcutPath,
+                        AssetsVersion = generatedAssetSet?.AssetsVersion ?? GeneratedAssetSet.CurrentAssetsVersion
+                    };
+
+                    await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
+                    attemptRecord = CreateFailureAttemptRecord(exception);
+                }
+
+                await _applicationContext.TileRecordStore.SavePinAttemptAsync(tileId, attemptRecord).ConfigureAwait(true);
+                batchTileIds.Add(tileId);
+
+                switch (attemptRecord.Status)
+                {
+                    case PinHelperResultStatus.Success:
+                        successCount++;
+                        break;
+                    case PinHelperResultStatus.Warning:
+                        successCount++;
+                        warningCount++;
+                        detailMessages.Add($"{ResolveTilePositionText(tileRecord)}：{attemptRecord.Message}");
+                        if (!string.IsNullOrWhiteSpace(attemptRecord.Warning))
+                        {
+                            detailMessages.Add(attemptRecord.Warning);
+                        }
+                        break;
+                    default:
+                        failureCount++;
+                        detailMessages.Add($"{ResolveTilePositionText(tileRecord)}：{attemptRecord.Message}");
+                        if (!string.IsNullOrWhiteSpace(attemptRecord.Warning))
+                        {
+                            detailMessages.Add(attemptRecord.Warning);
+                        }
+                        break;
+                }
+            }
+
+            var batchRecord = new TileBatchRecord
+            {
+                BatchId = batchId,
+                Title = TileIdentityBuilder.BuildBatchDisplayTitle(copiedSourcePath),
                 SourceImagePath = copiedSourcePath,
-                RequestedSize = _viewModel.SelectedSize,
-                HostExePath = hostExePath,
-                ShortcutPath = shortcutPath,
-                AssetsVersion = generatedAssetSet.AssetsVersion
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                TileIds = batchTileIds
             };
 
-            await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
-
-            // 先保留系统入口作为兼容探测，真正的自动固定统一交给 helper，避免 2x2 只弹侧栏不落地。
-            var shellPinResult = await _applicationContext.StartMenuPinVerbInvoker.TryPinAsync(
-                appUserModelId,
-                shortcutPath).ConfigureAwait(true);
-
-            // helper 才是负责真正写入 Start.TileGrid 的路径，前端现在统一只走默认请求。
-            var pinResult = await _applicationContext.PinHelperInvoker.PinImageAsync(
-                _applicationContext.PinHelperPath,
-                tileId,
-                _viewModel.SelectedSize,
-                hostExePath).ConfigureAwait(true);
-
-            var normalizedAttempt = NormalizePinAttempt(shellPinResult, pinResult, appUserModelId);
-            await _applicationContext.TileRecordStore.SavePinAttemptAsync(tileId, normalizedAttempt).ConfigureAwait(true);
+            await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(batchRecord).ConfigureAwait(true);
+            await ReconcileBatchRecordsAsync().ConfigureAwait(true);
             await RefreshHistoryAsync().ConfigureAwait(true);
 
-            SetStatus(normalizedAttempt.Message, MapStatusBrush(normalizedAttempt.Status));
-            if (normalizedAttempt.Status is PinHelperResultStatus.Warning or PinHelperResultStatus.Failure)
+            var statusBrush = failureCount > 0
+                ? Brushes.DarkGoldenrod
+                : warningCount > 0
+                    ? Brushes.DarkGoldenrod
+                    : Brushes.SeaGreen;
+            var statusMessage = failureCount > 0
+                ? $"本次固定完成：成功 {successCount}，失败 {failureCount}。"
+                : warningCount > 0
+                    ? $"本次固定完成：成功 {successCount}，其中 {warningCount} 块需要手动确认。"
+                    : $"已按顺序固定 {successCount} 个图片磁贴。";
+            SetStatus(statusMessage, statusBrush);
+
+            if (detailMessages.Count > 0)
             {
                 MessageBox.Show(
                     this,
-                    normalizedAttempt.Warning is { Length: > 0 }
-                        ? $"{normalizedAttempt.Message}\n\n{normalizedAttempt.Warning}"
-                        : normalizedAttempt.Message,
+                    $"{statusMessage}\n\n{string.Join(Environment.NewLine, detailMessages.Distinct(StringComparer.Ordinal))}",
                     "WinTiles",
                     MessageBoxButton.OK,
-                    normalizedAttempt.Status == PinHelperResultStatus.Failure
-                        ? MessageBoxImage.Error
-                        : MessageBoxImage.Warning);
+                    failureCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
             }
         }
         catch (Exception exception)
@@ -244,56 +536,47 @@ public partial class MainWindow : Window
             var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
             if (tileRecords.Count == 0)
             {
+                SetStatus("当前没有通过 WinTiles 固定的磁贴。", Brushes.DarkGoldenrod);
                 await RefreshHistoryAsync().ConfigureAwait(true);
-                const string emptyMessage = "当前没有通过 WinTiles 固定的磁贴。";
-                SetStatus(emptyMessage, Brushes.DarkGoldenrod);
-                MessageBox.Show(this, emptyMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            var clearedCount = 0;
+            var deletedCount = 0;
             var warningMessages = new List<string>();
-            var failureMessages = new List<string>();
 
             foreach (var tileRecord in tileRecords)
             {
                 var deleteResult = await TryDeletePinnedTileAsync(tileRecord).ConfigureAwait(true);
-                if (!deleteResult.Deleted)
+                if (deleteResult.Deleted)
                 {
-                    failureMessages.Add(deleteResult.FailureMessage ?? FormatTileMessage(tileRecord, "删除失败。"));
-                    continue;
+                    deletedCount++;
                 }
 
-                clearedCount++;
-                if (!string.IsNullOrWhiteSpace(deleteResult.WarningMessage))
+                if (!string.IsNullOrWhiteSpace(deleteResult.Message))
                 {
-                    warningMessages.Add(deleteResult.WarningMessage);
+                    warningMessages.Add(deleteResult.Message);
                 }
             }
 
+            await ReconcileBatchRecordsAsync().ConfigureAwait(true);
             await RefreshHistoryAsync().ConfigureAwait(true);
 
-            if (clearedCount == 0)
-            {
-                var failureMessage = CombineWarnings(failureMessages.ToArray()) ?? "未能清除任何磁贴。";
-                SetStatus("清除固定失败，请查看弹窗提示。", Brushes.Firebrick);
-                MessageBox.Show(this, failureMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
+            var statusMessage = deletedCount == 0
+                ? "没有成功清除任何磁贴。"
+                : deletedCount == 1
+                    ? "已清除 1 个通过 WinTiles 固定的磁贴。"
+                    : $"已清除 {deletedCount} 个通过 WinTiles 固定的磁贴。";
 
-            var successMessage = clearedCount == 1
-                ? "已清除 1 个通过 WinTiles 固定的磁贴。"
-                : $"已清除 {clearedCount} 个通过 WinTiles 固定的磁贴。";
+            SetStatus(statusMessage, deletedCount == 0 ? Brushes.Firebrick : Brushes.SeaGreen);
 
-            var combinedWarnings = CombineWarnings(warningMessages.Concat(failureMessages).ToArray());
-            if (!string.IsNullOrWhiteSpace(combinedWarnings))
+            if (warningMessages.Count > 0)
             {
-                SetStatus(successMessage, Brushes.DarkGoldenrod);
-                MessageBox.Show(this, $"{successMessage}\n\n{combinedWarnings}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            else
-            {
-                SetStatus(successMessage, Brushes.SeaGreen);
+                MessageBox.Show(
+                    this,
+                    $"{statusMessage}\n\n{string.Join(Environment.NewLine, warningMessages.Distinct(StringComparer.Ordinal))}",
+                    "WinTiles",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
         catch (Exception exception)
@@ -308,13 +591,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task DeleteSelectedHistoryAsync()
+    private async Task DeleteSingleTileAsync(TileHistoryItemViewModel historyItem)
     {
-        if (_selectedHistoryItem is null)
-        {
-            return;
-        }
-
         RefreshEnvironmentState();
         if (!_viewModel.IsClassicStartAvailable || !_viewModel.AreToolsAvailable)
         {
@@ -327,35 +605,23 @@ public partial class MainWindow : Window
             _viewModel.IsBusy = true;
             RefreshActionButtonsState();
 
-            var deleteResult = await TryDeletePinnedTileAsync(_selectedHistoryItem.TileRecord).ConfigureAwait(true);
+            var deleteResult = await TryDeletePinnedTileAsync(historyItem.TileRecord).ConfigureAwait(true);
+            await ReconcileBatchRecordsAsync().ConfigureAwait(true);
             await RefreshHistoryAsync().ConfigureAwait(true);
 
-            if (!deleteResult.Deleted)
-            {
-                SetStatus("删除历史失败，请查看弹窗提示。", Brushes.Firebrick);
-                MessageBox.Show(
-                    this,
-                    deleteResult.FailureMessage ?? "删除历史失败，请查看弹窗提示。",
-                    "WinTiles",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                return;
-            }
+            var statusMessage = deleteResult.Deleted
+                ? $"已删除 {ResolveTilePositionText(historyItem.TileRecord)}。"
+                : $"删除 {ResolveTilePositionText(historyItem.TileRecord)} 时遇到问题。";
+            SetStatus(statusMessage, deleteResult.Deleted ? Brushes.SeaGreen : Brushes.DarkGoldenrod);
 
-            var successMessage = "已删除 1 条固定历史。";
-            if (!string.IsNullOrWhiteSpace(deleteResult.WarningMessage))
+            if (!string.IsNullOrWhiteSpace(deleteResult.Message))
             {
-                SetStatus(successMessage, Brushes.DarkGoldenrod);
-                MessageBox.Show(this, $"{successMessage}\n\n{deleteResult.WarningMessage}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            else
-            {
-                SetStatus(successMessage, Brushes.SeaGreen);
+                MessageBox.Show(this, deleteResult.Message, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception exception)
         {
-            SetStatus("删除历史失败，请查看弹窗提示。", Brushes.Firebrick);
+            SetStatus("删除单块失败，请查看弹窗提示。", Brushes.Firebrick);
             MessageBox.Show(this, exception.Message, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -365,26 +631,331 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<(bool Deleted, string? WarningMessage, string? FailureMessage)> TryDeletePinnedTileAsync(TileRecord tileRecord)
+    private async Task DeleteBatchAsync(TileBatchHistoryItemViewModel historyItem)
     {
-        // 先尝试从 Start.TileGrid 解除固定；如果只是本地记录残留，也允许继续清理目录和快捷方式。
+        RefreshEnvironmentState();
+        if (!_viewModel.IsClassicStartAvailable || !_viewModel.AreToolsAvailable)
+        {
+            MessageBox.Show(this, _viewModel.AvailabilityMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            _viewModel.IsBusy = true;
+            RefreshActionButtonsState();
+
+            var deletedCount = 0;
+            var warningMessages = new List<string>();
+            foreach (var tileItem in historyItem.Tiles)
+            {
+                var deleteResult = await TryDeletePinnedTileAsync(tileItem.TileRecord).ConfigureAwait(true);
+                if (deleteResult.Deleted)
+                {
+                    deletedCount++;
+                }
+
+                if (!string.IsNullOrWhiteSpace(deleteResult.Message))
+                {
+                    warningMessages.Add(deleteResult.Message);
+                }
+            }
+
+            await ReconcileBatchRecordsAsync().ConfigureAwait(true);
+            await RefreshHistoryAsync().ConfigureAwait(true);
+
+            var statusMessage = deletedCount == 0
+                ? $"未能完整删除批次：{historyItem.DisplayTitle}"
+                : $"已处理批次：{historyItem.DisplayTitle}，成功删除 {deletedCount} 块。";
+            SetStatus(statusMessage, deletedCount == historyItem.Tiles.Count ? Brushes.SeaGreen : Brushes.DarkGoldenrod);
+
+            if (warningMessages.Count > 0)
+            {
+                MessageBox.Show(
+                    this,
+                    string.Join(Environment.NewLine, warningMessages.Distinct(StringComparer.Ordinal)),
+                    "WinTiles",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception exception)
+        {
+            SetStatus("删除批次失败，请查看弹窗提示。", Brushes.Firebrick);
+            MessageBox.Show(this, exception.Message, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _viewModel.IsBusy = false;
+            RefreshActionButtonsState();
+        }
+    }
+
+    private async Task RefreshHistoryAsync(string? preferredTileId = null)
+    {
+        var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
+        var batchRecords = await _applicationContext.TileRecordStore.LoadAllTileBatchRecordsAsync().ConfigureAwait(true);
+
+        var attemptTasks = tileRecords.ToDictionary(
+            tileRecord => tileRecord.TileId,
+            tileRecord => _applicationContext.TileRecordStore.LoadPinAttemptAsync(tileRecord.TileId));
+        await Task.WhenAll(attemptTasks.Values).ConfigureAwait(true);
+
+        var pinAttempts = attemptTasks.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.Result);
+
+        var historyItems = BuildBatchHistoryItems(tileRecords, batchRecords, pinAttempts, preferredTileId);
+
+        _viewModel.BatchHistoryItems.Clear();
+        foreach (var historyItem in historyItems)
+        {
+            _viewModel.BatchHistoryItems.Add(historyItem);
+        }
+
+        _viewModel.HasHistoryItems = historyItems.Count > 0;
+        _viewModel.HistoryCountText = $"{historyItems.Count} 批";
+        RefreshActionButtonsState();
+    }
+
+    private List<TileBatchHistoryItemViewModel> BuildBatchHistoryItems(
+        IReadOnlyList<TileRecord> tileRecords,
+        IReadOnlyList<TileBatchRecord> batchRecords,
+        IReadOnlyDictionary<string, PinAttemptRecord?> pinAttempts,
+        string? preferredTileId)
+    {
+        var tileRecordsById = tileRecords.ToDictionary(tileRecord => tileRecord.TileId, StringComparer.Ordinal);
+        var consumedTileIds = new HashSet<string>(StringComparer.Ordinal);
+        var historyItems = new List<TileBatchHistoryItemViewModel>();
+
+        foreach (var batchRecord in batchRecords)
+        {
+            var groupedTileRecords = batchRecord.TileIds
+                .Select(tileId => tileRecordsById.TryGetValue(tileId, out var tileRecord) ? tileRecord : null)
+                .Where(tileRecord => tileRecord is not null)
+                .Cast<TileRecord>()
+                .Concat(tileRecords.Where(tileRecord => string.Equals(tileRecord.BatchId, batchRecord.BatchId, StringComparison.Ordinal)))
+                .DistinctBy(tileRecord => tileRecord.TileId, StringComparer.Ordinal)
+                .ToArray();
+
+            if (groupedTileRecords.Length == 0)
+            {
+                continue;
+            }
+
+            foreach (var tileRecord in groupedTileRecords)
+            {
+                consumedTileIds.Add(tileRecord.TileId);
+            }
+
+            historyItems.Add(CreateBatchHistoryItem(batchRecord, groupedTileRecords, pinAttempts, preferredTileId));
+        }
+
+        foreach (var legacyGroup in tileRecords
+                     .Where(tileRecord => !consumedTileIds.Contains(tileRecord.TileId))
+                     .GroupBy(tileRecord => string.IsNullOrWhiteSpace(tileRecord.BatchId) ? tileRecord.TileId : tileRecord.BatchId!, StringComparer.Ordinal))
+        {
+            var groupedTileRecords = legacyGroup.ToArray();
+            var exemplar = groupedTileRecords[0];
+            var syntheticBatchRecord = new TileBatchRecord
+            {
+                BatchId = string.IsNullOrWhiteSpace(exemplar.BatchId) ? exemplar.TileId : exemplar.BatchId!,
+                Title = TileIdentityBuilder.BuildBatchDisplayTitle(exemplar.SourceImagePath),
+                SourceImagePath = exemplar.SourceImagePath,
+                CreatedAtUtc = GetRecordTimestampUtc(exemplar),
+                TileIds = groupedTileRecords.Select(tileRecord => tileRecord.TileId).ToList()
+            };
+
+            historyItems.Add(CreateBatchHistoryItem(syntheticBatchRecord, groupedTileRecords, pinAttempts, preferredTileId));
+        }
+
+        return historyItems
+            .OrderByDescending(item => item.Tiles.Max(tile => tile.SortTimestampUtc))
+            .ThenBy(item => item.DisplayTitle, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private TileBatchHistoryItemViewModel CreateBatchHistoryItem(
+        TileBatchRecord batchRecord,
+        IReadOnlyList<TileRecord> tileRecords,
+        IReadOnlyDictionary<string, PinAttemptRecord?> pinAttempts,
+        string? preferredTileId)
+    {
+        var tileItems = tileRecords
+            .Select(tileRecord => CreateTileHistoryItem(tileRecord, pinAttempts.TryGetValue(tileRecord.TileId, out var pinAttempt) ? pinAttempt : null))
+            .OrderBy(tileItem => tileItem.TileRecord.TileIndex ?? int.MaxValue)
+            .ThenBy(tileItem => tileItem.TileRecord.GridRow ?? int.MaxValue)
+            .ThenBy(tileItem => tileItem.TileRecord.GridColumn ?? int.MaxValue)
+            .ThenBy(tileItem => tileItem.TileId, StringComparer.Ordinal)
+            .ToArray();
+
+        var newestTimestamp = tileItems.Max(tileItem => tileItem.SortTimestampUtc);
+        var successCount = tileItems.Count(tileItem => tileItem.PinAttempt?.Status != PinHelperResultStatus.Failure);
+        var failureCount = tileItems.Length - successCount;
+        var hasWarning = tileItems.Any(tileItem => tileItem.PinAttempt?.Status == PinHelperResultStatus.Warning);
+        var summaryBrush = failureCount > 0
+            ? Brushes.DarkGoldenrod
+            : hasWarning
+                ? Brushes.DarkGoldenrod
+                : Brushes.SeaGreen;
+        var summaryText = failureCount > 0
+            ? $"成功 {successCount} 块，失败 {failureCount} 块"
+            : hasWarning
+                ? $"共 {tileItems.Length} 块，其中部分需要手动确认"
+                : $"共 {tileItems.Length} 块，已完成固定";
+
+        var batchHistoryItem = new TileBatchHistoryItemViewModel
+        {
+            BatchId = batchRecord.BatchId,
+            DisplayTitle = batchRecord.Title,
+            ThumbnailImage = TryCreateBitmapImage(batchRecord.SourceImagePath, 180),
+            HasThumbnailImage = File.Exists(batchRecord.SourceImagePath),
+            AttemptedAtText = newestTimestamp == DateTimeOffset.MinValue
+                ? "未记录时间"
+                : newestTimestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+            SummaryText = summaryText,
+            SummaryBrush = summaryBrush,
+            TileCountText = $"{tileItems.Length} 块",
+            SuccessCount = successCount,
+            FailureCount = failureCount,
+            SourceImagePath = batchRecord.SourceImagePath,
+            IsExpanded = tileItems.Any(tileItem => string.Equals(tileItem.TileId, preferredTileId, StringComparison.Ordinal))
+        };
+
+        foreach (var tileItem in tileItems)
+        {
+            batchHistoryItem.Tiles.Add(tileItem);
+        }
+
+        return batchHistoryItem;
+    }
+
+    private TileHistoryItemViewModel CreateTileHistoryItem(TileRecord tileRecord, PinAttemptRecord? pinAttempt)
+    {
+        var sortTimestampUtc = pinAttempt?.AttemptedAtUtc ?? GetRecordTimestampUtc(tileRecord);
+        var attemptedAtText = sortTimestampUtc == DateTimeOffset.MinValue
+            ? "未记录时间"
+            : sortTimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        var detailText = pinAttempt is null
+            ? "已保存固定记录"
+            : CombineWarnings(pinAttempt.Message, pinAttempt.Warning) ?? pinAttempt.Message;
+        var detailBrush = pinAttempt is null
+            ? Brushes.DarkSlateBlue
+            : MapStatusBrush(pinAttempt.Status);
+        var previewPath = tileRecord.PreviewImagePath;
+        var thumbnailImage = !string.IsNullOrWhiteSpace(previewPath)
+            ? TryCreateBitmapImage(previewPath, 160)
+            : TryCreateBitmapImage(tileRecord.SourceImagePath, 160);
+
+        return new TileHistoryItemViewModel
+        {
+            TileId = tileRecord.TileId,
+            DisplayTitle = ResolveHistoryDisplayTitle(tileRecord),
+            ThumbnailImage = thumbnailImage,
+            HasThumbnailImage = thumbnailImage is not null,
+            GridPositionText = ResolveTilePositionText(tileRecord),
+            AttemptedAtText = attemptedAtText,
+            DetailText = detailText,
+            DetailBrush = detailBrush,
+            SortTimestampUtc = sortTimestampUtc,
+            TileRecord = tileRecord,
+            PinAttempt = pinAttempt
+        };
+    }
+
+    private async Task ReconcileBatchRecordsAsync()
+    {
+        var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
+        var batchRecords = await _applicationContext.TileRecordStore.LoadAllTileBatchRecordsAsync().ConfigureAwait(true);
+        var batchRecordsById = batchRecords.ToDictionary(batchRecord => batchRecord.BatchId, StringComparer.Ordinal);
+
+        var groupedTileRecords = tileRecords
+            .Where(tileRecord => !string.IsNullOrWhiteSpace(tileRecord.BatchId))
+            .GroupBy(tileRecord => tileRecord.BatchId!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group
+                .OrderBy(tileRecord => tileRecord.TileIndex ?? int.MaxValue)
+                .ThenBy(tileRecord => tileRecord.GridRow ?? int.MaxValue)
+                .ThenBy(tileRecord => tileRecord.GridColumn ?? int.MaxValue)
+                .ThenBy(tileRecord => tileRecord.TileId, StringComparer.Ordinal)
+                .ToArray(), StringComparer.Ordinal);
+
+        foreach (var groupedRecord in groupedTileRecords)
+        {
+            var batchId = groupedRecord.Key;
+            var tileIds = groupedRecord.Value.Select(tileRecord => tileRecord.TileId).ToList();
+            var exemplar = groupedRecord.Value[0];
+
+            if (batchRecordsById.TryGetValue(batchId, out var existingBatchRecord))
+            {
+                var sourceImagePath = File.Exists(existingBatchRecord.SourceImagePath)
+                    ? existingBatchRecord.SourceImagePath
+                    : exemplar.SourceImagePath;
+                var updatedBatchRecord = new TileBatchRecord
+                {
+                    BatchId = batchId,
+                    Title = string.IsNullOrWhiteSpace(existingBatchRecord.Title)
+                        ? TileIdentityBuilder.BuildBatchDisplayTitle(sourceImagePath)
+                        : existingBatchRecord.Title,
+                    SourceImagePath = sourceImagePath,
+                    CreatedAtUtc = existingBatchRecord.CreatedAtUtc == DateTimeOffset.MinValue
+                        ? GetRecordTimestampUtc(exemplar)
+                        : existingBatchRecord.CreatedAtUtc,
+                    TileIds = tileIds
+                };
+
+                if (!existingBatchRecord.TileIds.SequenceEqual(tileIds, StringComparer.Ordinal) ||
+                    !string.Equals(existingBatchRecord.SourceImagePath, updatedBatchRecord.SourceImagePath, StringComparison.Ordinal))
+                {
+                    await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(updatedBatchRecord).ConfigureAwait(true);
+                }
+            }
+            else
+            {
+                var createdBatchRecord = new TileBatchRecord
+                {
+                    BatchId = batchId,
+                    Title = TileIdentityBuilder.BuildBatchDisplayTitle(exemplar.SourceImagePath),
+                    SourceImagePath = exemplar.SourceImagePath,
+                    CreatedAtUtc = GetRecordTimestampUtc(exemplar),
+                    TileIds = tileIds
+                };
+                await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(createdBatchRecord).ConfigureAwait(true);
+            }
+        }
+
+        foreach (var batchRecord in batchRecords)
+        {
+            if (!groupedTileRecords.ContainsKey(batchRecord.BatchId))
+            {
+                _applicationContext.TileRecordStore.DeleteBatchDirectory(batchRecord.BatchId);
+            }
+        }
+    }
+
+    private async Task<(bool Deleted, string? Message)> TryDeletePinnedTileAsync(TileRecord tileRecord)
+    {
+        // 无论 pin helper 是否报告完全成功，都继续清理本地快捷方式和记录，避免失败记录无法从历史里删除。
         var unpinResult = await _applicationContext.PinHelperInvoker.UnpinImageAsync(
             _applicationContext.PinHelperPath,
             tileRecord.TileId).ConfigureAwait(true);
 
-        if (unpinResult.Status == PinHelperResultStatus.Failure)
+        var messages = new List<string>();
+        if (unpinResult.Status == PinHelperResultStatus.Warning || unpinResult.Status == PinHelperResultStatus.Failure)
         {
-            return (false, null, FormatTileMessage(tileRecord, unpinResult.Message));
+            var helperMessage = CombineWarnings(unpinResult.Message, unpinResult.Warning);
+            if (!string.IsNullOrWhiteSpace(helperMessage))
+            {
+                messages.Add($"{ResolveTilePositionText(tileRecord)}：{helperMessage}");
+            }
         }
 
-        var tileMessages = new List<string>();
         try
         {
             DeleteFileIfExists(tileRecord.ShortcutPath);
         }
         catch (Exception cleanupException)
         {
-            tileMessages.Add($"删除快捷方式失败：{cleanupException.Message}");
+            messages.Add($"{ResolveTilePositionText(tileRecord)}：删除快捷方式失败：{cleanupException.Message}");
         }
 
         try
@@ -393,173 +964,222 @@ public partial class MainWindow : Window
         }
         catch (Exception cleanupException)
         {
-            tileMessages.Add($"删除本地记录失败：{cleanupException.Message}");
+            messages.Add($"{ResolveTilePositionText(tileRecord)}：删除本地记录失败：{cleanupException.Message}");
         }
 
-        var warningMessages = new List<string>();
-        var helperMessage = CombineWarnings(unpinResult.Message, unpinResult.Warning);
-        if (!string.IsNullOrWhiteSpace(helperMessage) && unpinResult.Status == PinHelperResultStatus.Warning)
-        {
-            warningMessages.Add(FormatTileMessage(tileRecord, helperMessage));
-        }
-
-        var cleanupMessage = CombineWarnings(tileMessages.ToArray());
-        if (!string.IsNullOrWhiteSpace(cleanupMessage))
-        {
-            warningMessages.Add(FormatTileMessage(tileRecord, cleanupMessage));
-        }
-
-        return (true, CombineWarnings(warningMessages.ToArray()), null);
+        return (true, CombineWarnings(messages.ToArray()));
     }
 
-    private string PrepareTileHost(string tileDirectory, string tileId)
+    private void InitializeCropCells()
     {
-        if (!File.Exists(_applicationContext.TileHostTemplatePath))
+        _viewModel.CropCells.Clear();
+        for (var row = 0; row < CropLayoutCalculator.GridDimension; row++)
         {
-            throw new FileNotFoundException("未找到 TileHost.exe，请先构建原生工具。", _applicationContext.TileHostTemplatePath);
-        }
-
-        var hostExePath = Path.Combine(tileDirectory, "TileHost.exe");
-        File.Copy(_applicationContext.TileHostTemplatePath, hostExePath, overwrite: true);
-
-        // 每个磁贴目录都会落一份独立 ini，保证点击磁贴时能准确回流到主程序。
-        _applicationContext.TileHostConfigurationWriter.Write(tileDirectory, _applicationContext.MainExecutablePath, tileId);
-        return hostExePath;
-    }
-
-    private string CreateStartMenuShortcut(
-        string tileId,
-        string hostExePath,
-        string appUserModelId,
-        string shortcutIconPath,
-        string manifestPath,
-        string displayTitle)
-    {
-        var startMenuPrograms = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
-            "Programs",
-            "WinTiles");
-        var shortcutFileName = TileIdentityBuilder.BuildShortcutFileName(_selectedImagePath!, tileId);
-        var shortcutPath = Path.Combine(startMenuPrograms, shortcutFileName);
-
-        return _applicationContext.StartMenuShortcutService.CreateShortcut(
-            shortcutPath,
-            hostExePath,
-            string.Empty,
-            Path.GetDirectoryName(hostExePath)!,
-            displayTitle,
-            appUserModelId,
-            shortcutIconPath,
-            manifestPath);
-    }
-
-    private static void DeleteFileIfExists(string path)
-    {
-        if (File.Exists(path))
-        {
-            File.Delete(path);
-        }
-    }
-
-    private PinAttemptRecord NormalizePinAttempt(
-        StartMenuPinVerbResult shellPinResult,
-        PinHelperResult? pinResult,
-        string appUserModelId)
-    {
-        if (shellPinResult.Invoked && pinResult is null)
-        {
-            return new PinAttemptRecord
+            for (var column = 0; column < CropLayoutCalculator.GridDimension; column++)
             {
-                AttemptedAtUtc = DateTimeOffset.UtcNow,
-                RequestedSize = _viewModel.SelectedSize,
-                Status = PinHelperResultStatus.Warning,
-                Message = $"已触发系统固定命令，但没有自动固定为 {_viewModel.SelectedSize.ToDisplayText()}，请检查开始菜单中的实际结果。",
-                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}",
-                Warning = null,
-                IdentityKind = "AppUserModelID",
-                IdentityValue = appUserModelId
-            };
+                _viewModel.CropCells.Add(new CropCellViewModel(row, column));
+            }
+        }
+    }
+
+    private void UpdateCropBoardLayout()
+    {
+        if (CropBoardHost is null)
+        {
+            return;
         }
 
-        if (shellPinResult.Invoked && pinResult is not null)
+        var boardSize = Math.Min(CropBoardHost.ActualWidth, CropBoardHost.ActualHeight);
+        if (boardSize <= 0)
         {
-            var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
-            var status = pinResult.Status;
-            var message = pinResult.Message;
+            return;
+        }
 
-            if (pinResult.Status == PinHelperResultStatus.Failure)
+        _viewModel.CropBoardSize = boardSize;
+
+        var boardSizeF = GetCropBoardSize();
+        var cellSize = _cropLayoutCalculator.CalculateCellSize(boardSizeF, CropCellGap);
+        foreach (var cell in _viewModel.CropCells)
+        {
+            var cellBounds = _cropLayoutCalculator.GetCellBounds(boardSizeF, CropCellGap, cell.Row, cell.Column);
+            cell.Left = cellBounds.Left;
+            cell.Top = cellBounds.Top;
+            cell.Size = cellSize;
+        }
+
+        EnsureCropTransformWithinBounds(recenterWhenNeeded: false);
+    }
+
+    private void ToggleCellAtPoint(Point point)
+    {
+        var cell = _viewModel.CropCells.FirstOrDefault(cropCell =>
+            point.X >= cropCell.Left &&
+            point.X <= cropCell.Left + cropCell.Size &&
+            point.Y >= cropCell.Top &&
+            point.Y <= cropCell.Top + cropCell.Size);
+
+        if (cell is null)
+        {
+            return;
+        }
+
+        var hadNoSelection = GetActiveCells().Count == 0;
+        cell.IsSelected = !cell.IsSelected;
+        UpdateSelectionSummary();
+
+        if (_viewModel.HasCropImage)
+        {
+            EnsureCropTransformWithinBounds(recenterWhenNeeded: hadNoSelection || GetActiveCells().Count == 1);
+        }
+
+        RefreshActionButtonsState();
+    }
+
+    private void LoadSelectedImage(string imagePath)
+    {
+        try
+        {
+            var bitmap = CreateBitmapImage(imagePath);
+            _viewModel.CropImage = bitmap;
+            _viewModel.HasCropImage = true;
+        _selectedImagePixelSize = new DrawingSizeF(bitmap.PixelWidth, bitmap.PixelHeight);
+
+            if (CropImageElement is not null)
             {
-                status = PinHelperResultStatus.Warning;
-                message = "已触发系统固定命令，但磁贴尺寸刷新失败，请检查开始菜单中的实际结果。";
-                warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
+                CropImageElement.Width = bitmap.PixelWidth;
+                CropImageElement.Height = bitmap.PixelHeight;
             }
 
-            return new PinAttemptRecord
-            {
-                AttemptedAtUtc = DateTimeOffset.UtcNow,
-                RequestedSize = _viewModel.SelectedSize,
-                Status = status,
-                Message = message,
-                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}+{pinResult.PinMethod}",
-                Warning = warning,
-                IdentityKind = pinResult.IdentityKind,
-                IdentityValue = pinResult.IdentityValue,
-                ContainsBefore = pinResult.ContainsBefore,
-                ContainsAfterCommit = pinResult.ContainsAfterCommit,
-                ContainsAfterReopen = pinResult.ContainsAfterReopen
-            };
+            _viewModel.CropTitle = Path.GetFileName(imagePath);
+            _viewModel.CropSubtitle = "已选择图片。点击格子启用区域，然后用滚轮缩放、拖拽位置。";
+            SetStatus($"已选择图片：{Path.GetFileName(imagePath)}", Brushes.DarkSlateBlue);
+            ResetCropTransform();
+        }
+        catch (Exception exception)
+        {
+            _selectedImagePath = null;
+            _selectedImagePixelSize = DrawingSizeF.Empty;
+            _viewModel.CropImage = null;
+            _viewModel.HasCropImage = false;
+            SetStatus($"加载图片失败：{exception.Message}", Brushes.Firebrick);
         }
 
-        if (pinResult is not null)
-        {
-            var status = pinResult.Status;
-            var message = pinResult.Message;
-            var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
-
-            if (shellPinResult.Invoked && pinResult.Status == PinHelperResultStatus.Failure)
-            {
-                status = PinHelperResultStatus.Warning;
-                message = "已触发系统固定命令，但磁贴尺寸刷新失败，请检查开始菜单中的实际结果。";
-                warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
-            }
-
-            return new PinAttemptRecord
-            {
-                AttemptedAtUtc = DateTimeOffset.UtcNow,
-                RequestedSize = _viewModel.SelectedSize,
-                Status = status,
-                Message = message,
-                PinMethod = pinResult.PinMethod,
-                Warning = warning,
-                IdentityKind = pinResult.IdentityKind,
-                IdentityValue = pinResult.IdentityValue,
-                ContainsBefore = pinResult.ContainsBefore,
-                ContainsAfterCommit = pinResult.ContainsAfterCommit,
-                ContainsAfterReopen = pinResult.ContainsAfterReopen
-            };
-        }
-
-        return new PinAttemptRecord
-        {
-            AttemptedAtUtc = DateTimeOffset.UtcNow,
-            RequestedSize = _viewModel.SelectedSize,
-            Status = PinHelperResultStatus.Failure,
-            Message = "未能触发系统固定命令。",
-            PinMethod = "ShellVerbUnavailable",
-            Warning = shellPinResult.ErrorMessage
-        };
+        RefreshActionButtonsState();
     }
 
-    private static string? CombineWarnings(params string?[] messages)
+    private void ResetCropTransform()
     {
-        var filteredMessages = messages
-            .Where(message => !string.IsNullOrWhiteSpace(message))
-            .Distinct(StringComparer.Ordinal)
+        if (!_viewModel.HasCropImage || _selectedImagePixelSize.Width <= 0 || _selectedImagePixelSize.Height <= 0)
+        {
+            ApplyCropState(1f, DrawingPointF.Empty, 1f);
+            return;
+        }
+
+        var activeCells = GetActiveCells();
+        var boardSize = GetCropBoardSize();
+        var minimumScale = _cropLayoutCalculator.CalculateMinimumScale(
+            _selectedImagePixelSize,
+            boardSize,
+            CropCellGap,
+            activeCells);
+        var centeredOffset = _cropLayoutCalculator.CalculateCenteredOffset(
+            _selectedImagePixelSize,
+            minimumScale,
+            boardSize,
+            CropCellGap,
+            activeCells);
+
+        ApplyCropState(minimumScale, centeredOffset, minimumScale);
+    }
+
+    private void EnsureCropTransformWithinBounds(bool recenterWhenNeeded)
+    {
+        if (!_viewModel.HasCropImage || _selectedImagePixelSize.Width <= 0 || _selectedImagePixelSize.Height <= 0)
+        {
+            return;
+        }
+
+        var activeCells = GetActiveCells();
+        var boardSize = GetCropBoardSize();
+        var minimumScale = _cropLayoutCalculator.CalculateMinimumScale(
+            _selectedImagePixelSize,
+            boardSize,
+            CropCellGap,
+            activeCells);
+
+        var scale = Math.Max((float)_viewModel.CropScale, minimumScale);
+        var offset = recenterWhenNeeded
+            ? _cropLayoutCalculator.CalculateCenteredOffset(
+                _selectedImagePixelSize,
+                scale,
+                boardSize,
+                CropCellGap,
+                activeCells)
+            : _cropLayoutCalculator.ClampOffset(
+                _selectedImagePixelSize,
+                scale,
+                boardSize,
+                CropCellGap,
+                activeCells,
+                new DrawingPointF((float)_viewModel.CropOffsetX, (float)_viewModel.CropOffsetY));
+
+        ApplyCropState(scale, offset, minimumScale);
+    }
+
+    private void ApplyCropState(float scale, DrawingPointF offset, float minimumScale)
+    {
+        _viewModel.CropScale = scale;
+        _viewModel.MinimumCropScale = minimumScale;
+        _viewModel.CropOffsetX = offset.X;
+        _viewModel.CropOffsetY = offset.Y;
+
+        if (CropImageScaleTransform is not null)
+        {
+            CropImageScaleTransform.ScaleX = scale;
+            CropImageScaleTransform.ScaleY = scale;
+        }
+
+        if (CropImageTranslateTransform is not null)
+        {
+            CropImageTranslateTransform.X = offset.X;
+            CropImageTranslateTransform.Y = offset.Y;
+        }
+
+        var zoomPercent = minimumScale <= 0f
+            ? 100d
+            : Math.Round(scale / minimumScale * 100d);
+        _viewModel.ZoomText = $"缩放 {zoomPercent:0}%";
+    }
+
+    private void UpdateSelectionSummary()
+    {
+        var activeCells = _viewModel.CropCells
+            .Where(cell => cell.IsSelected)
+            .OrderBy(cell => cell.Row)
+            .ThenBy(cell => cell.Column)
             .ToArray();
 
-        return filteredMessages.Length == 0
-            ? null
-            : string.Join(Environment.NewLine, filteredMessages);
+        foreach (var cell in _viewModel.CropCells)
+        {
+            cell.SelectionOrderText = string.Empty;
+        }
+
+        for (var index = 0; index < activeCells.Length; index++)
+        {
+            activeCells[index].SelectionOrderText = (index + 1).ToString();
+        }
+
+        _viewModel.SelectionSummaryText = activeCells.Length == 0
+            ? "尚未启用裁切区域"
+            : $"已启用 {activeCells.Length} / 25 个区域";
+    }
+
+    private void ApplyPanelMode(MainPanelMode panelMode)
+    {
+        _viewModel.PanelMode = panelMode;
+        _viewModel.StatusHintText = panelMode == MainPanelMode.Crop
+            ? "提示：拖拽图片可以调整位置，滚轮可以缩放，缩到刚好铺满启用区域时会自动吸附。"
+            : "提示：删除会同步移除开始菜单磁贴和本地记录；失败记录也可以直接清理。";
     }
 
     private void RefreshEnvironmentState()
@@ -585,242 +1205,261 @@ public partial class MainWindow : Window
             _viewModel.AvailabilityMessage = classicStartAvailability.Message;
             _viewModel.AvailabilityBrush = Brushes.SeaGreen;
         }
-
-        RefreshActionButtonsState();
-    }
-
-    private void RefreshPinButtonState()
-    {
-        if (PinImageButton is null)
-        {
-            return;
-        }
-
-        PinImageButton.IsEnabled =
-            !_viewModel.IsBusy &&
-            !string.IsNullOrWhiteSpace(_selectedImagePath) &&
-            _viewModel.IsClassicStartAvailable &&
-            _viewModel.AreToolsAvailable;
-    }
-
-    private void RefreshClearButtonState()
-    {
-        if (ClearPinButton is null)
-        {
-            return;
-        }
-
-        // 清除按钮是“当前软件固定的全部磁贴”入口，不依赖当前是否已选图片。
-        ClearPinButton.IsEnabled =
-            !_viewModel.IsBusy &&
-            _viewModel.IsClassicStartAvailable &&
-            _viewModel.AreToolsAvailable;
     }
 
     private void RefreshActionButtonsState()
     {
-        RefreshPinButtonState();
-        RefreshClearButtonState();
-        _viewModel.CanDeleteSelectedHistory =
+        var activeCellsCount = GetActiveCells().Count;
+        var environmentReady = _viewModel.IsClassicStartAvailable && _viewModel.AreToolsAvailable;
+
+        _viewModel.CanPinImage =
             !_viewModel.IsBusy &&
-            _selectedHistoryItem is not null &&
-            _viewModel.IsClassicStartAvailable &&
-            _viewModel.AreToolsAvailable;
+            !string.IsNullOrWhiteSpace(_selectedImagePath) &&
+            activeCellsCount > 0 &&
+            environmentReady;
+        _viewModel.CanOpenHistory = !_viewModel.IsBusy;
+        _viewModel.CanClearSelection = !_viewModel.IsBusy && activeCellsCount > 0;
+        _viewModel.CanClearAllPinnedTiles = !_viewModel.IsBusy && environmentReady && _viewModel.HasHistoryItems;
+        _viewModel.CanOpenRecordFolder = !_viewModel.IsBusy;
     }
 
-    private void ResetDefaultTileSize()
+    private string CopySourceImageToBatchDirectory(string batchDirectory, string sourceImagePath)
     {
-        // 现在前端不再给用户提供尺寸切换，内部请求统一回到默认 2x2。
-        _viewModel.SelectedSize = TileRequestSize.Medium2x2;
+        var sourceExtension = Path.GetExtension(sourceImagePath);
+        var copiedSourcePath = Path.Combine(batchDirectory, $"Source{sourceExtension}");
+        File.Copy(sourceImagePath, copiedSourcePath, overwrite: true);
+        return copiedSourcePath;
     }
 
-    private void HistoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private string PrepareTileHost(string tileDirectory, string tileId)
     {
-        if (_isRefreshingHistory)
+        if (!File.Exists(_applicationContext.TileHostTemplatePath))
         {
-            return;
+            throw new FileNotFoundException("未找到 TileHost.exe，请先构建原生工具。", _applicationContext.TileHostTemplatePath);
         }
 
-        // 历史列表选中后，右侧直接切到对应图片；如果只是取消选择，就保留当前图片预览。
-        var selectedItem = HistoryListBox?.SelectedItem as TileHistoryItemViewModel;
-        if (selectedItem is null)
-        {
-            _selectedHistoryItem = null;
-            if (string.IsNullOrWhiteSpace(_selectedImagePath))
-            {
-                ShowPreviewPlaceholder();
-            }
-            else
-            {
-                RefreshActionButtonsState();
-            }
+        var hostExePath = Path.Combine(tileDirectory, "TileHost.exe");
+        File.Copy(_applicationContext.TileHostTemplatePath, hostExePath, overwrite: true);
 
-            return;
-        }
-
-        ShowHistoryPreview(selectedItem);
+        // 每个磁贴目录都会落一份独立 ini，保证点击磁贴时能准确回流到主程序。
+        _applicationContext.TileHostConfigurationWriter.Write(tileDirectory, _applicationContext.MainExecutablePath, tileId);
+        return hostExePath;
     }
 
-    private async Task RefreshHistoryAsync(string? preferredTileId = null)
+    private string CreateStartMenuShortcut(
+        string sourceImagePath,
+        string tileId,
+        string hostExePath,
+        string appUserModelId,
+        string shortcutIconPath,
+        string manifestPath,
+        string displayTitle,
+        int? gridRow,
+        int? gridColumn)
     {
-        // 把本地固定记录重新聚合成历史列表，刷新时尽量保留用户刚才正在看的那一条。
-        var historyItems = await BuildHistoryItemsAsync().ConfigureAwait(true);
-        var previousSelectedTileId = _selectedHistoryItem?.TileId;
-        var hadHistorySelection = _selectedHistoryItem is not null;
-
-        _isRefreshingHistory = true;
-        try
-        {
-            _viewModel.HistoryItems.Clear();
-            foreach (var historyItem in historyItems)
-            {
-                _viewModel.HistoryItems.Add(historyItem);
-            }
-
-            _viewModel.HasHistoryItems = historyItems.Count > 0;
-            _viewModel.HistoryCountText = $"{historyItems.Count} 条";
-        }
-        finally
-        {
-            _isRefreshingHistory = false;
-        }
-
-        var selectedHistoryItem = !string.IsNullOrWhiteSpace(preferredTileId)
-            ? historyItems.FirstOrDefault(item => string.Equals(item.TileId, preferredTileId, StringComparison.Ordinal))
-            : !string.IsNullOrWhiteSpace(previousSelectedTileId)
-                ? historyItems.FirstOrDefault(item => string.Equals(item.TileId, previousSelectedTileId, StringComparison.Ordinal))
-                : null;
-
-        if (HistoryListBox is not null)
-        {
-            if (selectedHistoryItem is not null)
-            {
-                HistoryListBox.SelectedItem = selectedHistoryItem;
-            }
-            else if (hadHistorySelection)
-            {
-                HistoryListBox.SelectedItem = null;
-            }
-        }
-
-        if (selectedHistoryItem is null && hadHistorySelection)
-        {
-            ShowPreviewPlaceholder();
-        }
-
-        RefreshActionButtonsState();
+        var shortcutPath = BuildStartMenuShortcutPath(sourceImagePath, tileId, gridRow, gridColumn);
+        return _applicationContext.StartMenuShortcutService.CreateShortcut(
+            shortcutPath,
+            hostExePath,
+            string.Empty,
+            Path.GetDirectoryName(hostExePath)!,
+            displayTitle,
+            appUserModelId,
+            shortcutIconPath,
+            manifestPath);
     }
 
-    private async Task<IReadOnlyList<TileHistoryItemViewModel>> BuildHistoryItemsAsync()
+    private static void DeleteFileIfExists(string path)
     {
-        var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
-        var historyItems = await Task.WhenAll(tileRecords.Select(CreateHistoryItemAsync)).ConfigureAwait(true);
-
-        return historyItems
-            .OrderByDescending(item => item.SortTimestampUtc)
-            .ThenByDescending(item => item.TileId, StringComparer.Ordinal)
-            .ToArray();
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
-    private async Task<TileHistoryItemViewModel> CreateHistoryItemAsync(TileRecord tileRecord)
+    private PinAttemptRecord NormalizePinAttempt(
+        StartMenuPinVerbResult shellPinResult,
+        PinHelperResult? pinResult,
+        string appUserModelId)
     {
-        var pinAttempt = await _applicationContext.TileRecordStore.LoadPinAttemptAsync(tileRecord.TileId).ConfigureAwait(true);
-        var displayTitle = ResolveHistoryDisplayTitle(tileRecord);
-        var sortTimestampUtc = pinAttempt?.AttemptedAtUtc ?? GetRecordTimestampUtc(tileRecord);
-        var attemptedAtText = sortTimestampUtc == DateTimeOffset.MinValue
-            ? "未记录时间"
-            : sortTimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
-        var detailText = pinAttempt is null
-            ? "已保存固定记录"
-            : CombineWarnings(pinAttempt.Message, pinAttempt.Warning) ?? pinAttempt.Message;
-        var detailBrush = pinAttempt is null
-            ? Brushes.DarkSlateBlue
-            : MapStatusBrush(pinAttempt.Status);
-        var thumbnailImage = TryCreateBitmapImage(tileRecord.SourceImagePath, 180);
+        const TileRequestSize requestedSize = TileRequestSize.Medium2x2;
 
-        return new TileHistoryItemViewModel
+        if (shellPinResult.Invoked && pinResult is null)
         {
-            TileId = tileRecord.TileId,
-            DisplayTitle = displayTitle,
-            ThumbnailImage = thumbnailImage,
-            HasThumbnailImage = thumbnailImage is not null,
-            RequestedSizeText = tileRecord.RequestedSize.ToDisplayText(),
-            AttemptedAtText = attemptedAtText,
-            DetailText = detailText,
-            DetailBrush = detailBrush,
-            SortTimestampUtc = sortTimestampUtc,
-            TileRecord = tileRecord,
-            PinAttempt = pinAttempt
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = requestedSize,
+                Status = PinHelperResultStatus.Warning,
+                Message = "已触发系统固定命令，但没有确认开始菜单最终结果，请检查实际显示。",
+                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}",
+                IdentityKind = "AppUserModelID",
+                IdentityValue = appUserModelId
+            };
+        }
+
+        if (shellPinResult.Invoked && pinResult is not null)
+        {
+            var warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning);
+            var status = pinResult.Status;
+            var message = pinResult.Message;
+
+            if (pinResult.Status == PinHelperResultStatus.Failure)
+            {
+                status = PinHelperResultStatus.Warning;
+                message = "已触发系统固定命令，但内部刷新失败，请检查开始菜单中的实际结果。";
+                warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Message, pinResult.Warning);
+            }
+
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = requestedSize,
+                Status = status,
+                Message = message,
+                PinMethod = $"{shellPinResult.TargetName}.{shellPinResult.VerbName}+{pinResult.PinMethod}",
+                Warning = warning,
+                IdentityKind = pinResult.IdentityKind,
+                IdentityValue = pinResult.IdentityValue,
+                ContainsBefore = pinResult.ContainsBefore,
+                ContainsAfterCommit = pinResult.ContainsAfterCommit,
+                ContainsAfterReopen = pinResult.ContainsAfterReopen
+            };
+        }
+
+        if (pinResult is not null)
+        {
+            return new PinAttemptRecord
+            {
+                AttemptedAtUtc = DateTimeOffset.UtcNow,
+                RequestedSize = requestedSize,
+                Status = pinResult.Status,
+                Message = pinResult.Message,
+                PinMethod = pinResult.PinMethod,
+                Warning = CombineWarnings(shellPinResult.ErrorMessage, pinResult.Warning),
+                IdentityKind = pinResult.IdentityKind,
+                IdentityValue = pinResult.IdentityValue,
+                ContainsBefore = pinResult.ContainsBefore,
+                ContainsAfterCommit = pinResult.ContainsAfterCommit,
+                ContainsAfterReopen = pinResult.ContainsAfterReopen
+            };
+        }
+
+        return new PinAttemptRecord
+        {
+            AttemptedAtUtc = DateTimeOffset.UtcNow,
+            RequestedSize = requestedSize,
+            Status = PinHelperResultStatus.Failure,
+            Message = "未能触发系统固定命令。",
+            PinMethod = "ShellVerbUnavailable",
+            Warning = shellPinResult.ErrorMessage
         };
     }
 
-    private void ShowCurrentImagePreview(string imagePath)
+    private static PinAttemptRecord CreateFailureAttemptRecord(Exception exception)
     {
-        // 这里是“当前待固定图片”的预览态，和历史预览互斥。
-        _selectedHistoryItem = null;
-        _viewModel.SelectedHistoryBadgeText = $"待固定 · {_viewModel.SelectedSize.ToDisplayText()}";
-        _viewModel.PreviewTitle = Path.GetFileName(imagePath);
-        _viewModel.StatusText = $"已选择图片：{Path.GetFileName(imagePath)}";
-        _viewModel.StatusBrush = Brushes.DarkSlateBlue;
-
-        try
+        return new PinAttemptRecord
         {
-            _viewModel.PreviewImage = CreateBitmapImage(imagePath);
-            _viewModel.HasPreviewImage = true;
-        }
-        catch (Exception exception)
-        {
-            _selectedImagePath = null;
-            _viewModel.PreviewImage = null;
-            _viewModel.HasPreviewImage = false;
-            _viewModel.StatusText = $"加载图片失败：{exception.Message}";
-            _viewModel.StatusBrush = Brushes.Firebrick;
-        }
-
-        RefreshActionButtonsState();
+            AttemptedAtUtc = DateTimeOffset.UtcNow,
+            RequestedSize = TileRequestSize.Medium2x2,
+            Status = PinHelperResultStatus.Failure,
+            Message = $"生成或固定磁贴失败：{exception.Message}",
+            PinMethod = "BatchCropPipeline"
+        };
     }
 
-    private void ShowHistoryPreview(TileHistoryItemViewModel historyItem)
+    private static string? CombineWarnings(params string?[] messages)
     {
-        // 右侧切到历史记录时，优先展示这条固定对应的原图和固定结果。
-        _selectedHistoryItem = historyItem;
-        _selectedImagePath = null;
-        _viewModel.SelectedHistoryBadgeText = historyItem.RequestedSizeText;
-        _viewModel.PreviewTitle = historyItem.DisplayTitle;
+        var filteredMessages = messages
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
-        try
-        {
-            _viewModel.PreviewImage = CreateBitmapImage(historyItem.TileRecord.SourceImagePath);
-            _viewModel.HasPreviewImage = true;
-        }
-        catch (Exception exception)
-        {
-            _viewModel.PreviewImage = null;
-            _viewModel.HasPreviewImage = false;
-            _viewModel.StatusText = $"历史图片无法读取：{exception.Message}";
-            _viewModel.StatusBrush = Brushes.DarkGoldenrod;
-            RefreshActionButtonsState();
-            return;
-        }
-
-        var statusText = $"{historyItem.AttemptedAtText} · {historyItem.DetailText}";
-        _viewModel.StatusText = statusText;
-        _viewModel.StatusBrush = historyItem.DetailBrush;
-        RefreshActionButtonsState();
+        return filteredMessages.Length == 0
+            ? null
+            : string.Join(Environment.NewLine, filteredMessages);
     }
 
-    private void ShowPreviewPlaceholder()
+    private IReadOnlyCollection<(int Row, int Column)> GetActiveCells()
     {
-        // 没有当前图片也没有历史选中时，就回到提示态。
-        _selectedHistoryItem = null;
-        _viewModel.SelectedHistoryBadgeText = "历史预览";
-        _viewModel.PreviewTitle = "尚未选择图片或历史固定";
-        _viewModel.PreviewImage = null;
-        _viewModel.HasPreviewImage = false;
-        _viewModel.StatusText = "点击左侧历史条目，在右侧查看并删除。";
-        _viewModel.StatusBrush = Brushes.DarkSlateBlue;
-        RefreshActionButtonsState();
+        return _viewModel.CropCells
+            .Where(cell => cell.IsSelected)
+            .Select(cell => (cell.Row, cell.Column))
+            .ToArray();
     }
+
+    private DrawingSizeF GetCropBoardSize()
+    {
+        return new DrawingSizeF((float)_viewModel.CropBoardSize, (float)_viewModel.CropBoardSize);
+    }
+
+    private string BuildStartMenuShortcutPath(
+        string sourceImagePath,
+        string tileId,
+        int? gridRow,
+        int? gridColumn)
+    {
+        var startMenuPrograms = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            "Programs",
+            "WinTiles");
+        var shortcutFileName = TileIdentityBuilder.BuildShortcutFileName(sourceImagePath, tileId, gridRow, gridColumn);
+        return Path.Combine(startMenuPrograms, shortcutFileName);
+    }
+
+    private string ResolveHistoryDisplayTitle(TileRecord tileRecord)
+    {
+        var shortcutTitle = _applicationContext.StartMenuShortcutService.TryReadTitle(tileRecord.ShortcutPath);
+        if (!string.IsNullOrWhiteSpace(shortcutTitle))
+        {
+            return shortcutTitle;
+        }
+
+        return ResolveTilePositionText(tileRecord);
+    }
+
+    private static string ResolveTilePositionText(TileRecord tileRecord)
+    {
+        if (tileRecord.GridRow.HasValue && tileRecord.GridColumn.HasValue)
+        {
+            return $"第 {tileRecord.GridRow.Value + 1} 行 · 第 {tileRecord.GridColumn.Value + 1} 列";
+        }
+
+        if (tileRecord.TileIndex.HasValue)
+        {
+            return $"第 {tileRecord.TileIndex.Value + 1} 块";
+        }
+
+        return "未标注位置";
+    }
+
+    private static DateTimeOffset GetRecordTimestampUtc(TileRecord tileRecord)
+    {
+        if (File.Exists(tileRecord.ShortcutPath))
+        {
+            return new DateTimeOffset(File.GetCreationTimeUtc(tileRecord.ShortcutPath), TimeSpan.Zero);
+        }
+
+        if (File.Exists(tileRecord.SourceImagePath))
+        {
+            return new DateTimeOffset(File.GetCreationTimeUtc(tileRecord.SourceImagePath), TimeSpan.Zero);
+        }
+
+        return DateTimeOffset.MinValue;
+    }
+
+    private void SetStatus(string message, Brush brush)
+    {
+        _viewModel.StatusText = message;
+        _viewModel.StatusBrush = brush;
+    }
+
+    private static Brush MapStatusBrush(PinHelperResultStatus status) => status switch
+    {
+        PinHelperResultStatus.Success => Brushes.SeaGreen,
+        PinHelperResultStatus.Warning => Brushes.DarkGoldenrod,
+        _ => Brushes.Firebrick
+    };
 
     private static BitmapImage CreateBitmapImage(string imagePath, int? decodePixelWidth = null)
     {
@@ -854,48 +1493,4 @@ public partial class MainWindow : Window
             return null;
         }
     }
-
-    private string ResolveHistoryDisplayTitle(TileRecord tileRecord)
-    {
-        var shortcutTitle = _applicationContext.StartMenuShortcutService.TryReadTitle(tileRecord.ShortcutPath);
-        if (!string.IsNullOrWhiteSpace(shortcutTitle))
-        {
-            return shortcutTitle;
-        }
-
-        return Path.GetFileNameWithoutExtension(tileRecord.ShortcutPath);
-    }
-
-    private static DateTimeOffset GetRecordTimestampUtc(TileRecord tileRecord)
-    {
-        if (File.Exists(tileRecord.ShortcutPath))
-        {
-            return new DateTimeOffset(File.GetCreationTimeUtc(tileRecord.ShortcutPath), TimeSpan.Zero);
-        }
-
-        if (File.Exists(tileRecord.SourceImagePath))
-        {
-            return new DateTimeOffset(File.GetCreationTimeUtc(tileRecord.SourceImagePath), TimeSpan.Zero);
-        }
-
-        return DateTimeOffset.MinValue;
-    }
-
-    private void SetStatus(string message, Brush brush)
-    {
-        _viewModel.StatusText = message;
-        _viewModel.StatusBrush = brush;
-    }
-
-    private static string FormatTileMessage(TileRecord tileRecord, string message)
-    {
-        return $"{Path.GetFileNameWithoutExtension(tileRecord.ShortcutPath)}：{message}";
-    }
-
-    private static Brush MapStatusBrush(PinHelperResultStatus status) => status switch
-    {
-        PinHelperResultStatus.Success => Brushes.SeaGreen,
-        PinHelperResultStatus.Warning => Brushes.DarkGoldenrod,
-        _ => Brushes.Firebrick
-    };
 }

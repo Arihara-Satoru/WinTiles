@@ -1,57 +1,95 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using WinTiles.Core.Models;
 
 namespace WinTiles;
 
-public sealed class MainWindowViewModel : INotifyPropertyChanged
+public sealed class MainWindowViewModel : ViewModelBase
 {
-    private string _previewTitle = "尚未选择图片或历史固定";
-    private BitmapImage? _previewImage;
-    private bool _hasPreviewImage;
-    private string _statusText = "请选择一张图片，或从固定历史中点开一条记录。";
+    private MainPanelMode _panelMode = MainPanelMode.Crop;
+    private string _cropTitle = "尚未选择图片";
+    private string _cropSubtitle = "点击网格启用裁切区域，然后在右侧用滚轮缩放、拖拽图片位置。";
+    private BitmapImage? _cropImage;
+    private bool _hasCropImage;
+    private string _statusText = "请选择一张图片，然后点击右侧网格启用裁切区域。";
+    private string _statusHintText = "提示：拖拽图片可以调整位置，滚轮可以缩放，缩到刚好铺满时会自动吸附。";
     private Brush _statusBrush = Brushes.DarkSlateBlue;
     private string _availabilityMessage = "正在检查经典开始菜单状态…";
     private Brush _availabilityBrush = Brushes.DarkSlateBlue;
     private string _recordLocationText = "本地记录目录";
-    private string _selectedHistoryBadgeText = "历史预览";
     private string _historyCountText = "0 条";
-    private TileRequestSize _selectedSize = TileRequestSize.Medium2x2;
     private bool _isClassicStartAvailable;
     private bool _areToolsAvailable;
     private bool _isBusy;
     private bool _hasHistoryItems;
-    private bool _canDeleteSelectedHistory;
+    private bool _canPinImage;
+    private bool _canOpenHistory;
+    private bool _canClearSelection;
+    private bool _canClearAllPinnedTiles;
+    private bool _canOpenRecordFolder = true;
+    private string _selectionSummaryText = "尚未启用裁切区域";
+    private string _zoomText = "缩放 100%";
+    private double _cropScale = 1d;
+    private double _minimumCropScale = 1d;
+    private double _cropOffsetX;
+    private double _cropOffsetY;
+    private double _cropBoardSize = 640d;
 
-    public ObservableCollection<TileHistoryItemViewModel> HistoryItems { get; } = new();
+    public ObservableCollection<CropCellViewModel> CropCells { get; } = new();
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public ObservableCollection<TileBatchHistoryItemViewModel> BatchHistoryItems { get; } = new();
 
-    public string PreviewTitle
+    public MainPanelMode PanelMode
     {
-        get => _previewTitle;
-        set => SetField(ref _previewTitle, value);
+        get => _panelMode;
+        set
+        {
+            if (SetField(ref _panelMode, value))
+            {
+                OnPropertyChanged(nameof(IsCropMode));
+                OnPropertyChanged(nameof(IsHistoryMode));
+            }
+        }
     }
 
-    public BitmapImage? PreviewImage
+    public bool IsCropMode => PanelMode == MainPanelMode.Crop;
+
+    public bool IsHistoryMode => PanelMode == MainPanelMode.History;
+
+    public string CropTitle
     {
-        get => _previewImage;
-        set => SetField(ref _previewImage, value);
+        get => _cropTitle;
+        set => SetField(ref _cropTitle, value);
     }
 
-    public bool HasPreviewImage
+    public string CropSubtitle
     {
-        get => _hasPreviewImage;
-        set => SetField(ref _hasPreviewImage, value);
+        get => _cropSubtitle;
+        set => SetField(ref _cropSubtitle, value);
+    }
+
+    public BitmapImage? CropImage
+    {
+        get => _cropImage;
+        set => SetField(ref _cropImage, value);
+    }
+
+    public bool HasCropImage
+    {
+        get => _hasCropImage;
+        set => SetField(ref _hasCropImage, value);
     }
 
     public string StatusText
     {
         get => _statusText;
         set => SetField(ref _statusText, value);
+    }
+
+    public string StatusHintText
+    {
+        get => _statusHintText;
+        set => SetField(ref _statusHintText, value);
     }
 
     public Brush StatusBrush
@@ -78,22 +116,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set => SetField(ref _recordLocationText, value);
     }
 
-    public string SelectedHistoryBadgeText
-    {
-        get => _selectedHistoryBadgeText;
-        set => SetField(ref _selectedHistoryBadgeText, value);
-    }
-
     public string HistoryCountText
     {
         get => _historyCountText;
         set => SetField(ref _historyCountText, value);
-    }
-
-    public TileRequestSize SelectedSize
-    {
-        get => _selectedSize;
-        set => SetField(ref _selectedSize, value);
     }
 
     public bool IsClassicStartAvailable
@@ -120,20 +146,75 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set => SetField(ref _hasHistoryItems, value);
     }
 
-    public bool CanDeleteSelectedHistory
+    public bool CanPinImage
     {
-        get => _canDeleteSelectedHistory;
-        set => SetField(ref _canDeleteSelectedHistory, value);
+        get => _canPinImage;
+        set => SetField(ref _canPinImage, value);
     }
 
-    private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    public bool CanOpenHistory
     {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return;
-        }
+        get => _canOpenHistory;
+        set => SetField(ref _canOpenHistory, value);
+    }
 
-        field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    public bool CanClearSelection
+    {
+        get => _canClearSelection;
+        set => SetField(ref _canClearSelection, value);
+    }
+
+    public bool CanClearAllPinnedTiles
+    {
+        get => _canClearAllPinnedTiles;
+        set => SetField(ref _canClearAllPinnedTiles, value);
+    }
+
+    public bool CanOpenRecordFolder
+    {
+        get => _canOpenRecordFolder;
+        set => SetField(ref _canOpenRecordFolder, value);
+    }
+
+    public string SelectionSummaryText
+    {
+        get => _selectionSummaryText;
+        set => SetField(ref _selectionSummaryText, value);
+    }
+
+    public string ZoomText
+    {
+        get => _zoomText;
+        set => SetField(ref _zoomText, value);
+    }
+
+    public double CropScale
+    {
+        get => _cropScale;
+        set => SetField(ref _cropScale, value);
+    }
+
+    public double MinimumCropScale
+    {
+        get => _minimumCropScale;
+        set => SetField(ref _minimumCropScale, value);
+    }
+
+    public double CropOffsetX
+    {
+        get => _cropOffsetX;
+        set => SetField(ref _cropOffsetX, value);
+    }
+
+    public double CropOffsetY
+    {
+        get => _cropOffsetY;
+        set => SetField(ref _cropOffsetY, value);
+    }
+
+    public double CropBoardSize
+    {
+        get => _cropBoardSize;
+        set => SetField(ref _cropBoardSize, value);
     }
 }
