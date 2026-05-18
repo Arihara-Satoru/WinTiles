@@ -214,7 +214,8 @@
                                         </Image>
                                     </Canvas>
 
-                                    <ItemsControl ItemsSource="{Binding CropCells}"
+                                    <ItemsControl x:Name="CropCellsOverlaySource"
+                                                  ItemsSource="{Binding CropCells}"
                                                   IsHitTestVisible="False">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -307,56 +308,96 @@
                                                 </Style.Triggers>
                                             </Style>
                                         </Grid.Style>
-                                        <StackPanel HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center">
-                                            <Border Width="92"
-                                                    Height="92"
-                                                    HorizontalAlignment="Center"
-                                                    Background="{StaticResource PrimaryAccentSoftBrush}"
-                                                    BorderBrush="#D5E3FB"
-                                                    BorderThickness="1"
-                                                    CornerRadius="26">
-                                                <Viewbox Margin="20">
-                                                    <Canvas Width="24"
-                                                            Height="24">
-                                                        <Rectangle Width="19"
-                                                                   Height="14"
-                                                                   Canvas.Left="2.5"
-                                                                   Canvas.Top="4.5"
-                                                                   RadiusX="2.8"
-                                                                   RadiusY="2.8"
-                                                                   Stroke="{StaticResource PrimaryAccentBrush}"
-                                                                   StrokeThickness="1.5"
-                                                                   Fill="Transparent" />
-                                                        <Ellipse Width="3"
-                                                                 Height="3"
-                                                                 Canvas.Left="6"
-                                                                 Canvas.Top="7"
-                                                                 Fill="{StaticResource PrimaryAccentBrush}" />
-                                                        <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
-                                                                  Stroke="{StaticResource PrimaryAccentBrush}"
-                                                                  StrokeThickness="1.8"
-                                                                  StrokeStartLineCap="Round"
-                                                                  StrokeEndLineCap="Round"
-                                                                  StrokeLineJoin="Round" />
-                                                    </Canvas>
-                                                </Viewbox>
-                                            </Border>
-                                            <TextBlock Margin="0,18,0,0"
-                                                       HorizontalAlignment="Center"
-                                                       FontSize="22"
-                                                       FontWeight="Medium"
-                                                       Foreground="{StaticResource PrimaryTextBrush}"
-                                                       Text="先选择图片，再调整裁切" />
-                                            <TextBlock Margin="0,10,0,0"
-                                                       Width="340"
-                                                       HorizontalAlignment="Center"
-                                                       FontSize="15"
-                                                       Foreground="{StaticResource SecondaryTextBrush}"
-                                                       Text="你也可以先点击某些格子启用区域，再上传图片。上传后滚轮缩放、拖拽位置都会对整张图一起生效。"
-                                                       TextAlignment="Center"
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
+                                        <!-- 空状态下让整块裁切板呈现类似 Windows 11 亚克力的覆盖层，并保留底层网格的模糊轮廓。 -->
+                                        <Grid>
+                                            <Rectangle>
+                                                <Rectangle.Fill>
+                                                    <VisualBrush Visual="{Binding ElementName=CropCellsOverlaySource}"
+                                                                 Stretch="Fill" />
+                                                </Rectangle.Fill>
+                                                <Rectangle.Effect>
+                                                    <BlurEffect Radius="24"
+                                                                RenderingBias="Quality" />
+                                                </Rectangle.Effect>
+                                            </Rectangle>
+                                            <Rectangle>
+                                                <Rectangle.Fill>
+                                                    <LinearGradientBrush StartPoint="0,0"
+                                                                         EndPoint="1,1">
+                                                        <GradientStop Offset="0"
+                                                                      Color="#F2FAFFFF" />
+                                                        <GradientStop Offset="0.42"
+                                                                      Color="#E9F5FFEE" />
+                                                        <GradientStop Offset="1"
+                                                                      Color="#D9EDFCDD" />
+                                                    </LinearGradientBrush>
+                                                </Rectangle.Fill>
+                                            </Rectangle>
+                                            <Border Background="#12FFFFFF"
+                                                    BorderBrush="#A8FFFFFF"
+                                                    BorderThickness="1" />
+                                            <Border Margin="10"
+                                                    Background="#14FFFFFF"
+                                                    BorderBrush="#34FFFFFF"
+                                                    BorderThickness="1" />
+
+                                            <StackPanel HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                <Border Width="92"
+                                                        Height="92"
+                                                        HorizontalAlignment="Center"
+                                                        Background="#CCEEF5FF"
+                                                        BorderBrush="#C8FFFFFF"
+                                                        BorderThickness="1"
+                                                        CornerRadius="26">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect BlurRadius="18"
+                                                                          ShadowDepth="0"
+                                                                          Color="#1A4A7CCF"
+                                                                          Opacity="0.28" />
+                                                    </Border.Effect>
+                                                    <Viewbox Margin="20">
+                                                        <Canvas Width="24"
+                                                                Height="24">
+                                                            <Rectangle Width="19"
+                                                                       Height="14"
+                                                                       Canvas.Left="2.5"
+                                                                       Canvas.Top="4.5"
+                                                                       RadiusX="2.8"
+                                                                       RadiusY="2.8"
+                                                                       Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                       StrokeThickness="1.5"
+                                                                       Fill="Transparent" />
+                                                            <Ellipse Width="3"
+                                                                     Height="3"
+                                                                     Canvas.Left="6"
+                                                                     Canvas.Top="7"
+                                                                     Fill="{StaticResource PrimaryAccentBrush}" />
+                                                            <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
+                                                                      Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                      StrokeThickness="1.8"
+                                                                      StrokeStartLineCap="Round"
+                                                                      StrokeEndLineCap="Round"
+                                                                      StrokeLineJoin="Round" />
+                                                        </Canvas>
+                                                    </Viewbox>
+                                                </Border>
+                                                <TextBlock Margin="0,18,0,0"
+                                                           HorizontalAlignment="Center"
+                                                           FontSize="22"
+                                                           FontWeight="Medium"
+                                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                                           Text="先选择图片，再调整裁切" />
+                                                <TextBlock Margin="0,10,0,0"
+                                                           Width="340"
+                                                           HorizontalAlignment="Center"
+                                                           FontSize="15"
+                                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                                           Text="你也可以先点击某些格子启用区域，再上传图片。上传后滚轮缩放、拖拽位置都会对整张图一起生效。"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
                                     </Grid>
                                 </Grid>
                             </Border>
