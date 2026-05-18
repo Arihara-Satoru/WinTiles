@@ -25,6 +25,8 @@
   <ItemGroup>
     <!-- 同时把图标嵌入 WPF 资源，供窗口标题栏和任务栏直接引用。 -->
     <Resource Include="Assets\WinTiles.ico" />
+    <!-- 左上角品牌区使用单独的高分辨率图片资源，避免界面里直接显示 ico 时发糊。 -->
+    <Resource Include="Assets\BrandPanelImage.png" />
   </ItemGroup>
 
   <ItemGroup>

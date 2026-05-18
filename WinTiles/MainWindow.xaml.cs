@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private readonly MainWindowViewModel _viewModel;
     private readonly CropLayoutCalculator _cropLayoutCalculator;
 
+    private SilentUpdatePreparationResult? _preparedUpdate;
     private string? _selectedImagePath;
     private DrawingSizeF _selectedImagePixelSize;
     private Point? _dragStartPoint;
@@ -62,7 +63,7 @@ public partial class MainWindow : Window
         _ = CheckForUpdatesAsync(
             showUpToDateMessage: false,
             showFailureMessage: false,
-            promptWhenUpdateAvailable: true);
+            showUpdatePrompt: true);
     }
 
     public async Task HandleActivationAsync(string? tileId)
@@ -123,7 +124,7 @@ public partial class MainWindow : Window
         await CheckForUpdatesAsync(
             showUpToDateMessage: true,
             showFailureMessage: true,
-            promptWhenUpdateAvailable: true).ConfigureAwait(true);
+            showUpdatePrompt: true).ConfigureAwait(true);
     }
 
     private void BackToCropButton_Click(object sender, RoutedEventArgs e)
@@ -1268,7 +1269,7 @@ public partial class MainWindow : Window
     private async Task CheckForUpdatesAsync(
         bool showUpToDateMessage,
         bool showFailureMessage,
-        bool promptWhenUpdateAvailable)
+        bool showUpdatePrompt)
     {
         if (_viewModel.IsCheckingForUpdates)
         {
@@ -1297,9 +1298,11 @@ public partial class MainWindow : Window
             if (result.IsUpdateAvailable && result.Release is not null)
             {
                 SetStatus(result.SummaryText, Brushes.DarkSlateBlue);
-                if (promptWhenUpdateAvailable)
+                // 先征求用户确认，再决定是否下载更新包，避免启动后自动占用带宽和磁盘。
+                _viewModel.UpdateStatusText = $"发现新版本 {result.Release.Version.ToString(3)}，等待用户确认是否下载。";
+                if (showUpdatePrompt)
                 {
-                    ShowUpdatePrompt(result.Release, result.CurrentVersionText);
+                    await PromptDownloadUpdateAsync(result.Release, result.CurrentVersionText).ConfigureAwait(true);
                 }
 
                 return;
@@ -1317,30 +1320,81 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowUpdatePrompt(UpdateReleaseInfo release, string currentVersionText)
+    private async Task PromptDownloadUpdateAsync(UpdateReleaseInfo release, string currentVersionText)
     {
-        var targetUrl = release.DownloadUrl ?? release.HtmlUrl;
-        var assetText = string.IsNullOrWhiteSpace(release.AssetName)
-            ? "最新发布页"
-            : $"下载包：{release.AssetName}";
-        var message = $"检测到新版本 {release.Version.ToString(3)}。\n当前版本：{currentVersionText}\n{assetText}\n\n是否现在打开下载页？";
+        var message = $"发现新版本 {release.Version.ToString(3)}，当前版本 {currentVersionText}。\n\n是否现在下载更新包？";
+        var result = MessageBox.Show(this, message, "WinTiles 更新", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (result != MessageBoxResult.Yes)
+        {
+            _viewModel.UpdateStatusText = $"发现新版本 {release.Version.ToString(3)}，你可以稍后手动点击“检查更新”再下载。";
+            return;
+        }
+
+        // 用户明确确认后才开始下载，下载结束前不触发安装流程。
+        _viewModel.UpdateStatusText = $"正在下载新版本 {release.Version.ToString(3)}…";
+        var preparedUpdate = await _applicationContext.SilentUpdateService
+            .PrepareUpdateAsync(release)
+            .ConfigureAwait(true);
+        _preparedUpdate = preparedUpdate;
+        _viewModel.UpdateStatusText = preparedUpdate.Message;
+
+        if (preparedUpdate.IsReadyToInstall)
+        {
+            PromptInstallPreparedUpdate(preparedUpdate);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(release.HtmlUrl))
+        {
+            var openReleasePageResult = MessageBox.Show(
+                this,
+                $"{preparedUpdate.Message}\n\n是否改为打开 GitHub Release 页面手动下载？",
+                "WinTiles 更新",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (openReleasePageResult == MessageBoxResult.Yes)
+            {
+                OpenUrl(release.HtmlUrl);
+            }
+        }
+    }
+
+    private void PromptInstallPreparedUpdate(SilentUpdatePreparationResult preparedUpdate)
+    {
+        var message = $"{preparedUpdate.Message}\n\n是否现在重启并自动完成升级？";
         var result = MessageBox.Show(this, message, "WinTiles 更新", MessageBoxButton.YesNo, MessageBoxImage.Information);
         if (result != MessageBoxResult.Yes)
         {
             return;
         }
 
+        if (!_applicationContext.SilentUpdateService.TryStartInstaller(
+                preparedUpdate,
+                Environment.ProcessId,
+                out var errorMessage))
+        {
+            MessageBox.Show(this, errorMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // 启动外部升级器后尽快退出当前进程，让文件替换可以顺利完成。
+        Application.Current.Shutdown();
+    }
+
+    private void OpenUrl(string url)
+    {
         try
         {
+            // 使用系统默认浏览器打开发布页，避免把下载逻辑塞回应用内部。
             Process.Start(new ProcessStartInfo
             {
-                FileName = targetUrl,
+                FileName = url,
                 UseShellExecute = true
             });
         }
         catch (Exception exception)
         {
-            MessageBox.Show(this, $"打开更新地址失败：{exception.Message}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"打开发布页失败：{exception.Message}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

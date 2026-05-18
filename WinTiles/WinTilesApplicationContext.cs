@@ -6,6 +6,8 @@ public sealed class WinTilesApplicationContext
 {
     public required GitHubReleaseUpdateService ReleaseUpdateService { get; init; }
 
+    public required SilentUpdateService SilentUpdateService { get; init; }
+
     public required string MainExecutablePath { get; init; }
 
     public required string PinHelperPath { get; init; }

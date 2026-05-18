@@ -47,64 +47,13 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Orientation="Horizontal">
+                        <!-- 这里改成使用单独的高分辨率品牌图，避免直接显示 ico 时在界面里发糊。 -->
                         <Border Width="90"
                                 Height="90"
-                                CornerRadius="26">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#5CA5FF" Offset="0" />
-                                    <GradientStop Color="#2A6FF3" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <Grid>
-                                <UniformGrid Margin="20"
-                                             Rows="2"
-                                             Columns="2">
-                                    <Border Margin="0,0,6,6"
-                                            Background="#EAF3FF"
-                                            CornerRadius="6" />
-                                    <Border Margin="6,0,0,6"
-                                            Background="#EAF3FF"
-                                            CornerRadius="6" />
-                                    <Border Margin="0,6,6,0"
-                                            Background="#EAF3FF"
-                                            CornerRadius="6" />
-                                    <Border Margin="6,6,0,0"
-                                            Background="#EAF3FF"
-                                            CornerRadius="6" />
-                                </UniformGrid>
-                                <Canvas HorizontalAlignment="Right"
-                                        VerticalAlignment="Bottom"
-                                        Width="34"
-                                        Height="34"
-                                        Margin="0,0,2,2">
-                                    <Ellipse Canvas.Left="18"
-                                             Canvas.Top="1"
-                                             Width="8"
-                                             Height="8"
-                                             Fill="#EAF3FF" />
-                                    <Rectangle Canvas.Left="20"
-                                               Canvas.Top="6"
-                                               Width="3"
-                                               Height="13"
-                                               Fill="#EAF3FF"
-                                               RenderTransformOrigin="0.5,0.5">
-                                        <Rectangle.RenderTransform>
-                                            <RotateTransform Angle="35" CenterX="1.5" CenterY="6.5" />
-                                        </Rectangle.RenderTransform>
-                                    </Rectangle>
-                                    <Rectangle Canvas.Left="14"
-                                               Canvas.Top="14"
-                                               Width="3"
-                                               Height="8"
-                                               Fill="#EAF3FF"
-                                               RenderTransformOrigin="0.5,0.5">
-                                        <Rectangle.RenderTransform>
-                                            <RotateTransform Angle="35" CenterX="1.5" CenterY="4" />
-                                        </Rectangle.RenderTransform>
-                                    </Rectangle>
-                                </Canvas>
-                            </Grid>
+                                CornerRadius="26"
+                                Background="Transparent">
+                            <Image Source="Assets/BrandPanelImage.png"
+                                   Stretch="Uniform" />
                         </Border>
 
                         <StackPanel Margin="18,6,0,0">

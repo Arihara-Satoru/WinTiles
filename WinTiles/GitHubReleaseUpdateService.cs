@@ -55,6 +55,11 @@ public sealed class GitHubReleaseUpdateService
                     : $"当前已是最新版本 {_currentVersionText}。"
             };
         }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return CreateFailureResult(
+                $"检查更新失败：更新源 {_owner}/{_repository} 返回 404。请确认当前运行的是最新构建，或检查仓库是否仍然公开可访问。");
+        }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
         {
             return CreateFailureResult($"检查更新失败：{exception.Message}");
