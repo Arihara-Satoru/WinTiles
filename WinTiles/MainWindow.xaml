@@ -58,7 +58,7 @@
 
                         <StackPanel Margin="18,6,0,0">
                             <TextBlock FontSize="40"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        Foreground="{StaticResource PrimaryTextBrush}"
                                        Text="WinTiles" />
                             <TextBlock Margin="0,12,0,0"
@@ -106,7 +106,7 @@
                                         BorderThickness="1"
                                         CornerRadius="999">
                                     <TextBlock FontSize="12"
-                                               FontWeight="SemiBold"
+                                               FontWeight="Medium"
                                                Foreground="{StaticResource PrimaryAccentBrush}"
                                                Text="{Binding HistoryCountText}" />
                                 </Border>
@@ -167,7 +167,7 @@
                         <Grid>
                             <StackPanel>
                                 <TextBlock FontSize="26"
-                                           FontWeight="SemiBold"
+                                           FontWeight="Medium"
                                            Foreground="{StaticResource PrimaryTextBrush}"
                                            Text="预览区 · 图片裁切" />
                                 <TextBlock Margin="0,10,0,0"
@@ -250,7 +250,7 @@
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
                                                                FontSize="28"
-                                                               FontWeight="SemiBold"
+                                                               FontWeight="Normal"
                                                                Foreground="#79A9FF"
                                                                Text="+" />
                                                     <Border x:Name="OrderBadge"
@@ -267,7 +267,7 @@
                                                         <TextBlock HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"
                                                                    FontSize="13"
-                                                                   FontWeight="SemiBold"
+                                                                   FontWeight="Medium"
                                                                    Foreground="{StaticResource PrimaryAccentBrush}"
                                                                    Text="{Binding SelectionOrderText}" />
                                                     </Border>
@@ -345,7 +345,7 @@
                                             <TextBlock Margin="0,18,0,0"
                                                        HorizontalAlignment="Center"
                                                        FontSize="22"
-                                                       FontWeight="SemiBold"
+                                                       FontWeight="Medium"
                                                        Foreground="{StaticResource PrimaryTextBrush}"
                                                        Text="先选择图片，再调整裁切" />
                                             <TextBlock Margin="0,10,0,0"
@@ -377,7 +377,7 @@
 
                                 <StackPanel>
                                     <TextBlock FontSize="15"
-                                               FontWeight="SemiBold"
+                                               FontWeight="Medium"
                                                Foreground="{StaticResource PrimaryAccentBrush}"
                                                Text="{Binding SelectionSummaryText}"
                                                TextWrapping="Wrap" />
@@ -417,7 +417,7 @@
 
                             <StackPanel>
                                 <TextBlock FontSize="26"
-                                           FontWeight="SemiBold"
+                                           FontWeight="Medium"
                                            Foreground="{StaticResource PrimaryTextBrush}"
                                            Text="固定历史" />
                                 <TextBlock Margin="0,10,0,0"
@@ -516,7 +516,7 @@
                                                                         <TextBlock HorizontalAlignment="Center"
                                                                                    VerticalAlignment="Center"
                                                                                    FontSize="16"
-                                                                                   FontWeight="SemiBold"
+                                                                                   FontWeight="Medium"
                                                                                    Foreground="{StaticResource PrimaryAccentBrush}"
                                                                                    Text="图片">
                                                                             <TextBlock.Style>
@@ -536,7 +536,7 @@
                                                                 <StackPanel Grid.Column="2"
                                                                             VerticalAlignment="Center">
                                                                     <TextBlock FontSize="18"
-                                                                               FontWeight="SemiBold"
+                                                                               FontWeight="Medium"
                                                                                Foreground="{StaticResource PrimaryTextBrush}"
                                                                                Text="{Binding DisplayTitle}"
                                                                                TextTrimming="CharacterEllipsis" />
@@ -560,7 +560,7 @@
                                                                             BorderThickness="1"
                                                                             CornerRadius="999">
                                                                         <TextBlock FontSize="13"
-                                                                                   FontWeight="SemiBold"
+                                                                                   FontWeight="Medium"
                                                                                    Foreground="{StaticResource PrimaryAccentBrush}"
                                                                                    Text="{Binding TileCountText}" />
                                                                     </Border>
@@ -620,7 +620,7 @@
                                                                                         <TextBlock HorizontalAlignment="Center"
                                                                                                    VerticalAlignment="Center"
                                                                                                    FontSize="14"
-                                                                                                   FontWeight="SemiBold"
+                                                                                                   FontWeight="Medium"
                                                                                                    Foreground="{StaticResource PrimaryAccentBrush}"
                                                                                                    Text="预览">
                                                                                             <TextBlock.Style>
@@ -640,7 +640,7 @@
                                                                                 <StackPanel Grid.Column="2"
                                                                                             VerticalAlignment="Center">
                                                                                     <TextBlock FontSize="16"
-                                                                                               FontWeight="SemiBold"
+                                                                                               FontWeight="Medium"
                                                                                                Foreground="{StaticResource PrimaryTextBrush}"
                                                                                                Text="{Binding GridPositionText}" />
                                                                                     <TextBlock Margin="0,4,0,0"
@@ -708,14 +708,14 @@
                                         <TextBlock HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
                                                    FontSize="28"
-                                                   FontWeight="SemiBold"
+                                                   FontWeight="Medium"
                                                    Foreground="{StaticResource PrimaryAccentBrush}"
                                                    Text="历史" />
                                     </Border>
                                     <TextBlock Margin="0,18,0,0"
                                                HorizontalAlignment="Center"
                                                FontSize="22"
-                                               FontWeight="SemiBold"
+                                               FontWeight="Medium"
                                                Foreground="{StaticResource PrimaryTextBrush}"
                                                Text="尚未固定历史" />
                                     <TextBlock Margin="0,10,0,0"
@@ -740,7 +740,7 @@
                             CornerRadius="24">
                         <StackPanel>
                             <TextBlock FontSize="15"
-                                       FontWeight="SemiBold"
+                                       FontWeight="Medium"
                                        Foreground="{Binding StatusBrush}"
                                        Text="{Binding StatusText}"
                                        TextWrapping="Wrap" />

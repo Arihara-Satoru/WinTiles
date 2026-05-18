@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:effects="clr-namespace:System.Windows.Media.Effects;assembly=PresentationCore">
     <Application.Resources>
+        <!-- 统一使用更适合中文界面的系统字体回退链，减少中文笔画粗细不均的问题。 -->
+        <FontFamily x:Key="AppFontFamily">Microsoft YaHei UI, Microsoft YaHei, Segoe UI</FontFamily>
+
         <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#FDFEFF" Offset="0" />
             <GradientStop Color="#F3F7FD" Offset="0.55" />
@@ -27,6 +30,19 @@
         <SolidColorBrush x:Key="InfoBorderBrush" Color="#DDE8F6" />
 
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <!-- 让常见控件默认走统一字体和更适合界面阅读的文本渲染模式。 -->
+        <Style TargetType="Control">
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+        </Style>
 
         <effects:DropShadowEffect x:Key="PanelShadowEffect"
                                   BlurRadius="28"
@@ -63,9 +79,9 @@
             <Setter Property="Margin" Value="0,0,0,12" />
             <Setter Property="Padding" Value="18,16" />
             <Setter Property="MinHeight" Value="64" />
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
             <Setter Property="FontSize" Value="16" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontWeight" Value="Normal" />
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource SurfaceBorderBrush}" />
@@ -147,7 +163,7 @@
         <!-- 统一按钮正文的字重和字号，避免同一区域出现粗细不一致的观感。 -->
         <Style x:Key="ActionButtonTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontWeight" Value="Normal" />
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
