@@ -27,8 +27,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _canClearSelection;
     private bool _canClearAllPinnedTiles;
     private bool _canOpenRecordFolder = true;
+    private bool _canCheckForUpdates = true;
+    private bool _isCheckingForUpdates;
     private string _selectionSummaryText = "尚未启用裁切区域";
     private string _zoomText = "缩放 100%";
+    private string _updateStatusText = "版本检查未开始。";
     private double _cropScale = 1d;
     private double _minimumCropScale = 1d;
     private double _cropOffsetX;
@@ -176,6 +179,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetField(ref _canOpenRecordFolder, value);
     }
 
+    public bool CanCheckForUpdates
+    {
+        get => _canCheckForUpdates;
+        set => SetField(ref _canCheckForUpdates, value);
+    }
+
+    public bool IsCheckingForUpdates
+    {
+        get => _isCheckingForUpdates;
+        set => SetField(ref _isCheckingForUpdates, value);
+    }
+
     public string SelectionSummaryText
     {
         get => _selectionSummaryText;
@@ -186,6 +201,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _zoomText;
         set => SetField(ref _zoomText, value);
+    }
+
+    public string UpdateStatusText
+    {
+        get => _updateStatusText;
+        set => SetField(ref _updateStatusText, value);
     }
 
     public double CropScale

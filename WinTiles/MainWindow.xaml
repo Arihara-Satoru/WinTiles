@@ -163,6 +163,14 @@
                                 </Border>
                             </StackPanel>
                         </Button>
+
+                        <Button x:Name="CheckForUpdatesButton"
+                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                Click="CheckForUpdatesButton_Click"
+                                IsEnabled="{Binding CanCheckForUpdates}">
+                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                       Text="检查更新" />
+                        </Button>
                     </StackPanel>
 
                     <Border Grid.Row="3"
@@ -171,13 +179,19 @@
                             BorderBrush="{StaticResource InfoBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="18">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="10"
-                                     Height="10"
-                                     Margin="0,7,10,0"
-                                     Fill="{Binding AvailabilityBrush}" />
-                            <TextBlock Text="{Binding AvailabilityMessage}"
-                                       Foreground="{Binding AvailabilityBrush}"
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="10"
+                                         Height="10"
+                                         Margin="0,7,10,0"
+                                         Fill="{Binding AvailabilityBrush}" />
+                                <TextBlock Text="{Binding AvailabilityMessage}"
+                                           Foreground="{Binding AvailabilityBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Margin="20,8,0,0"
+                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                       Text="{Binding UpdateStatusText}"
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>

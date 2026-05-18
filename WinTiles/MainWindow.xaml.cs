@@ -57,6 +57,12 @@ public partial class MainWindow : Window
         {
             await HandleActivationAsync(startupTileId).ConfigureAwait(true);
         }
+
+        // 更新检查放到主界面完成初始化之后异步触发，避免网络波动拖慢首屏可用时间。
+        _ = CheckForUpdatesAsync(
+            showUpToDateMessage: false,
+            showFailureMessage: false,
+            promptWhenUpdateAvailable: true);
     }
 
     public async Task HandleActivationAsync(string? tileId)
@@ -110,6 +116,14 @@ public partial class MainWindow : Window
     private async void PinImageButton_Click(object sender, RoutedEventArgs e)
     {
         await PinCurrentImageAsync().ConfigureAwait(true);
+    }
+
+    private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
+    {
+        await CheckForUpdatesAsync(
+            showUpToDateMessage: true,
+            showFailureMessage: true,
+            promptWhenUpdateAvailable: true).ConfigureAwait(true);
     }
 
     private void BackToCropButton_Click(object sender, RoutedEventArgs e)
@@ -1248,6 +1262,86 @@ public partial class MainWindow : Window
         _viewModel.CanClearSelection = !_viewModel.IsBusy && activeCellsCount > 0;
         _viewModel.CanClearAllPinnedTiles = !_viewModel.IsBusy && environmentReady && _viewModel.HasHistoryItems;
         _viewModel.CanOpenRecordFolder = !_viewModel.IsBusy;
+        _viewModel.CanCheckForUpdates = !_viewModel.IsBusy && !_viewModel.IsCheckingForUpdates;
+    }
+
+    private async Task CheckForUpdatesAsync(
+        bool showUpToDateMessage,
+        bool showFailureMessage,
+        bool promptWhenUpdateAvailable)
+    {
+        if (_viewModel.IsCheckingForUpdates)
+        {
+            return;
+        }
+
+        try
+        {
+            _viewModel.IsCheckingForUpdates = true;
+            _viewModel.UpdateStatusText = "正在检查 GitHub Releases…";
+            RefreshActionButtonsState();
+
+            var result = await _applicationContext.ReleaseUpdateService.CheckForUpdatesAsync().ConfigureAwait(true);
+            _viewModel.UpdateStatusText = result.ErrorMessage ?? result.SummaryText;
+
+            if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+            {
+                if (showFailureMessage)
+                {
+                    MessageBox.Show(this, result.ErrorMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                return;
+            }
+
+            if (result.IsUpdateAvailable && result.Release is not null)
+            {
+                SetStatus(result.SummaryText, Brushes.DarkSlateBlue);
+                if (promptWhenUpdateAvailable)
+                {
+                    ShowUpdatePrompt(result.Release, result.CurrentVersionText);
+                }
+
+                return;
+            }
+
+            if (showUpToDateMessage)
+            {
+                MessageBox.Show(this, result.SummaryText, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        finally
+        {
+            _viewModel.IsCheckingForUpdates = false;
+            RefreshActionButtonsState();
+        }
+    }
+
+    private void ShowUpdatePrompt(UpdateReleaseInfo release, string currentVersionText)
+    {
+        var targetUrl = release.DownloadUrl ?? release.HtmlUrl;
+        var assetText = string.IsNullOrWhiteSpace(release.AssetName)
+            ? "最新发布页"
+            : $"下载包：{release.AssetName}";
+        var message = $"检测到新版本 {release.Version.ToString(3)}。\n当前版本：{currentVersionText}\n{assetText}\n\n是否现在打开下载页？";
+        var result = MessageBox.Show(this, message, "WinTiles 更新", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = targetUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"打开更新地址失败：{exception.Message}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private string CopySourceImageToBatchDirectory(string batchDirectory, string sourceImagePath)

@@ -69,6 +69,7 @@ public partial class App : Application
 
         return new WinTilesApplicationContext
         {
+            ReleaseUpdateService = new GitHubReleaseUpdateService("Arihara-Satoru", "WinTiles"),
             MainExecutablePath = Environment.ProcessPath ?? Path.Combine(appBaseDirectory, "WinTiles.exe"),
             PinHelperPath = Path.Combine(toolsRoot, "WinTiles.PinHelper.exe"),
             TileHostTemplatePath = Path.Combine(toolsRoot, "TileHost.exe"),

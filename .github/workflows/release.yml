@@ -1,0 +1,105 @@
+name: build-and-release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $projectFile = Join-Path $env:GITHUB_WORKSPACE "WinTiles\WinTiles.csproj"
+          $versionPrefixMatch = Select-String -Path $projectFile -Pattern '<VersionPrefix>([^<]+)</VersionPrefix>'
+          if (-not $versionPrefixMatch) {
+              throw "VersionPrefix was not found in WinTiles.csproj."
+          }
+
+          $versionPrefix = $versionPrefixMatch.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+              $tag = $env:GITHUB_REF_NAME
+              $version = $tag.TrimStart([char[]]@('v', 'V'))
+              $isPrerelease = "false"
+          }
+          else {
+              # 主分支的每次推送都生成一个可安装的预发布版本，方便直接回归和分发。
+              $version = "$versionPrefix.$env:GITHUB_RUN_NUMBER"
+              $tag = "v$version"
+              $isPrerelease = "true"
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "is_prerelease=$isPrerelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: dotnet restore .\WinTiles.slnx
+
+      - name: Run tests
+        shell: pwsh
+        run: dotnet test .\WinTiles.slnx -c Release --no-restore
+
+      - name: Build portable package
+        shell: pwsh
+        run: .\publish-portable.ps1 -Configuration Release -Version "${{ steps.meta.outputs.version }}" -RuntimeIdentifier "win-x64"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $isPrerelease = "${{ steps.meta.outputs.is_prerelease }}"
+          $assetPath = Join-Path $env:GITHUB_WORKSPACE "artifacts\release\WinTiles-v$version-win-x64.zip"
+          $title = "WinTiles $tag"
+          $notes = @"
+          Automated build for commit $env:GITHUB_SHA
+
+          Version: $version
+          Workflow run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID
+          "@
+
+          if (gh release view $tag 1>$null 2>$null) {
+              if ($isPrerelease -eq "true") {
+                  gh release edit $tag --title $title --notes $notes --prerelease
+              }
+              else {
+                  gh release edit $tag --title $title --notes $notes --latest
+              }
+          }
+          else {
+              if ($isPrerelease -eq "true") {
+                  gh release create $tag --target $env:GITHUB_SHA --title $title --notes $notes --prerelease
+              }
+              else {
+                  gh release create $tag --target $env:GITHUB_SHA --title $title --notes $notes --latest
+              }
+          }
+
+          gh release upload $tag $assetPath --clobber
