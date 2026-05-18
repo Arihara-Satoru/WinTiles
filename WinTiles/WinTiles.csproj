@@ -23,6 +23,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- 把主程序自己的桌面磁贴清单和磁贴图片一起带到输出目录，供开始菜单解析。 -->
+    <None Include="WinTiles.VisualElementsManifest.xml"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="TileAssets\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="Tools\**\*"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />

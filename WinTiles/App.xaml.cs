@@ -6,6 +6,9 @@ namespace WinTiles;
 
 public partial class App : Application
 {
+    private const string MainAppDisplayName = "WinTiles";
+    private const string MainAppUserModelId = "WinTiles.MainApp";
+
     private Mutex? _singleInstanceMutex;
     private SingleInstanceCoordinator? _singleInstanceCoordinator;
 
@@ -24,6 +27,7 @@ public partial class App : Application
         }
 
         var applicationContext = CreateApplicationContext();
+        EnsureMainAppStartMenuShortcut(applicationContext);
         var mainWindow = new MainWindow(applicationContext);
         MainWindow = mainWindow;
 
@@ -78,5 +82,37 @@ public partial class App : Application
             StartMenuPinVerbInvoker = new StartMenuPinVerbInvoker(),
             PinHelperInvoker = new PinHelperInvoker()
         };
+    }
+
+    private static void EnsureMainAppStartMenuShortcut(WinTilesApplicationContext applicationContext)
+    {
+        try
+        {
+            var appBaseDirectory = AppContext.BaseDirectory;
+            var startMenuShortcutPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Microsoft",
+                "Windows",
+                "Start Menu",
+                "Programs",
+                $"{MainAppDisplayName}.lnk");
+            var visualElementsManifestPath = Path.Combine(appBaseDirectory, "WinTiles.VisualElementsManifest.xml");
+
+            // 主程序入口统一刷新为带磁贴提示的开始菜单快捷方式，
+            // 这样用户固定 WinTiles 本体时，壳层更容易走桌面磁贴资源而不是回退成小图标。
+            applicationContext.StartMenuShortcutService.CreateShortcut(
+                startMenuShortcutPath,
+                applicationContext.MainExecutablePath,
+                arguments: string.Empty,
+                workingDirectory: appBaseDirectory,
+                description: MainAppDisplayName,
+                appUserModelId: MainAppUserModelId,
+                iconPath: applicationContext.MainExecutablePath,
+                visualElementsManifestHintPath: File.Exists(visualElementsManifestPath) ? visualElementsManifestPath : null);
+        }
+        catch
+        {
+            // 入口修复失败时不要影响主程序启动，后续用户仍可先进入应用继续操作。
+        }
     }
 }

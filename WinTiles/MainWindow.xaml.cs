@@ -496,7 +496,6 @@ public partial class MainWindow : Window
                 : warningCount > 0
                     ? $"本次固定完成：成功 {successCount}，其中 {warningCount} 块需要手动确认。"
                     : $"已按顺序固定 {successCount} 个图片磁贴。";
-            SetStatus(statusMessage, statusBrush);
 
             if (detailMessages.Count > 0)
             {
@@ -507,6 +506,9 @@ public partial class MainWindow : Window
                     MessageBoxButton.OK,
                     failureCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
             }
+
+            ClearSelectedImageAfterBatchPin();
+            SetStatus($"{statusMessage} 已自动清空裁剪区图片。", statusBrush);
         }
         catch (Exception exception)
         {
@@ -1065,6 +1067,30 @@ public partial class MainWindow : Window
             SetStatus($"加载图片失败：{exception.Message}", Brushes.Firebrick);
         }
 
+        RefreshActionButtonsState();
+    }
+
+    // 固定完一批后只清空当前图片，保留已启用区域，方便用户继续按同一布局处理下一张图。
+    private void ClearSelectedImageAfterBatchPin()
+    {
+        _selectedImagePath = null;
+        _selectedImagePixelSize = DrawingSizeF.Empty;
+        _dragStartPoint = null;
+        _dragStartOffset = DrawingPointF.Empty;
+        _isDraggingCropImage = false;
+
+        _viewModel.CropImage = null;
+        _viewModel.HasCropImage = false;
+        _viewModel.CropTitle = "尚未选择图片";
+        _viewModel.CropSubtitle = "本批固定完成。已保留启用区域，请重新选择图片继续固定。";
+
+        if (CropImageElement is not null)
+        {
+            CropImageElement.Width = 0;
+            CropImageElement.Height = 0;
+        }
+
+        ApplyCropState(1f, DrawingPointF.Empty, 1f);
         RefreshActionButtonsState();
     }
 

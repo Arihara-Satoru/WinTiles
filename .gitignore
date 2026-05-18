@@ -45,6 +45,7 @@ packages/
 tmp-*/
 tmp-*.cs
 tmp-*.txt
+*.lscache
 *.log
 *.tmp
 *.cache
@@ -54,4 +55,3 @@ tmp-*.txt
 # ------------------------------
 Thumbs.db
 Desktop.ini
-
