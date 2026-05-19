@@ -137,7 +137,6 @@ public partial class MainWindow : Window
         foreach (var cell in _viewModel.CropCells)
         {
             cell.IsSelected = false;
-            cell.SelectionOrderText = string.Empty;
         }
 
         UpdateSelectionSummary();
@@ -1200,16 +1199,6 @@ public partial class MainWindow : Window
             .OrderBy(cell => cell.Row)
             .ThenBy(cell => cell.Column)
             .ToArray();
-
-        foreach (var cell in _viewModel.CropCells)
-        {
-            cell.SelectionOrderText = string.Empty;
-        }
-
-        for (var index = 0; index < activeCells.Length; index++)
-        {
-            activeCells[index].SelectionOrderText = (index + 1).ToString();
-        }
 
         _viewModel.SelectionSummaryText = activeCells.Length == 0
             ? "尚未启用裁切区域"

@@ -6,7 +6,6 @@ public sealed class CropCellViewModel : ViewModelBase
     private double _left;
     private double _top;
     private double _size;
-    private string _selectionOrderText = string.Empty;
 
     public CropCellViewModel(int row, int column)
     {
@@ -26,7 +25,6 @@ public sealed class CropCellViewModel : ViewModelBase
             if (SetField(ref _isSelected, value))
             {
                 OnPropertyChanged(nameof(ShowPlus));
-                OnPropertyChanged(nameof(ShowSelectionOrder));
             }
         }
     }
@@ -49,19 +47,5 @@ public sealed class CropCellViewModel : ViewModelBase
         set => SetField(ref _size, value);
     }
 
-    public string SelectionOrderText
-    {
-        get => _selectionOrderText;
-        set
-        {
-            if (SetField(ref _selectionOrderText, value))
-            {
-                OnPropertyChanged(nameof(ShowSelectionOrder));
-            }
-        }
-    }
-
     public bool ShowPlus => !IsSelected;
-
-    public bool ShowSelectionOrder => IsSelected && !string.IsNullOrWhiteSpace(SelectionOrderText);
 }

@@ -254,24 +254,6 @@
                                                                FontWeight="Normal"
                                                                Foreground="#79A9FF"
                                                                Text="+" />
-                                                    <Border x:Name="OrderBadge"
-                                                            Width="34"
-                                                            Height="34"
-                                                            Margin="10"
-                                                            HorizontalAlignment="Left"
-                                                            VerticalAlignment="Top"
-                                                            Background="#FDFEFF"
-                                                            BorderBrush="#D6E4FB"
-                                                            BorderThickness="1"
-                                                            CornerRadius="17"
-                                                            Visibility="Collapsed">
-                                                        <TextBlock HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center"
-                                                                   FontSize="13"
-                                                                   FontWeight="Medium"
-                                                                   Foreground="{StaticResource PrimaryAccentBrush}"
-                                                                   Text="{Binding SelectionOrderText}" />
-                                                    </Border>
                                                 </Grid>
                                                 <DataTemplate.Triggers>
                                                     <DataTrigger Binding="{Binding IsSelected}"
@@ -283,12 +265,6 @@
                                                                 Property="Visibility"
                                                                 Value="Collapsed" />
                                                         <Setter TargetName="ActiveCell"
-                                                                Property="Visibility"
-                                                                Value="Visible" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding ShowSelectionOrder}"
-                                                                 Value="True">
-                                                        <Setter TargetName="OrderBadge"
                                                                 Property="Visibility"
                                                                 Value="Visible" />
                                                     </DataTrigger>
