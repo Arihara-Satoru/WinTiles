@@ -44,6 +44,7 @@ packages/
 # ------------------------------
 tmp-*/
 tmp-*.cs
+tmp-*.html
 tmp-*.txt
 *.lscache
 *.log

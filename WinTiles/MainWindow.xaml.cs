@@ -1452,7 +1452,7 @@ public partial class MainWindow : Window
         {
             var openReleasePageResult = MessageBox.Show(
                 this,
-                $"{preparedUpdate.Message}\n\n是否改为打开 GitHub Release 页面手动下载？",
+                BuildManualDownloadPromptMessage(preparedUpdate.Message),
                 "WinTiles 更新",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -1461,6 +1461,18 @@ public partial class MainWindow : Window
                 OpenUrl(release.HtmlUrl);
             }
         }
+    }
+
+    /// <summary>
+    /// 构造手动下载更新时展示给用户的提示文案，并补充 Data 目录迁移说明。
+    /// </summary>
+    /// <param name="preparedUpdateMessage">当前更新准备阶段返回的提示文本。</param>
+    /// <returns>供弹窗直接展示的完整提示内容。</returns>
+    private string BuildManualDownloadPromptMessage(string preparedUpdateMessage)
+    {
+        var applicationDirectory = Path.GetDirectoryName(_applicationContext.MainExecutablePath) ?? AppContext.BaseDirectory;
+        var dataDirectory = Path.Combine(applicationDirectory, "Data");
+        return $"{preparedUpdateMessage}\n\n如果你改为手动下载新版本，请把当前目录下的 Data 文件夹一起迁移到新版本目录中，否则现有数据不会自动带过去。\n\n当前 Data 路径：{dataDirectory}\n\n是否改为打开 GitHub Release 页面手动下载？";
     }
 
     private void PromptInstallPreparedUpdate(SilentUpdatePreparationResult preparedUpdate)
