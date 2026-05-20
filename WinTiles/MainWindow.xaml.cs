@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         _viewModel.RecordLocationText = _applicationContext.TileRecordStore.RootDirectory;
 
         InitializeCropCells();
+        UpdateClickActionState();
     }
 
     public async Task InitializeAsync(string? startupTileId)
@@ -86,6 +87,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (await TryExecuteTileClickActionAsync(tileRecord).ConfigureAwait(true))
+        {
+            return;
+        }
+
         ApplyPanelMode(MainPanelMode.History);
         await RefreshHistoryAsync(tileId).ConfigureAwait(true);
         SetStatus($"已定位到磁贴记录：{ResolveTilePositionText(tileRecord)}", Brushes.DarkSlateBlue);
@@ -117,6 +123,80 @@ public partial class MainWindow : Window
     private async void PinImageButton_Click(object sender, RoutedEventArgs e)
     {
         await PinCurrentImageAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// 切换为“不设置点击动作”选项，并刷新界面状态。
+    /// </summary>
+    private void NoClickActionRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedClickActionType = TileClickActionType.None;
+        UpdateClickActionState();
+    }
+
+    /// <summary>
+    /// 切换为“打开网页”动作，并刷新界面状态。
+    /// </summary>
+    private void OpenUrlActionRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedClickActionType = TileClickActionType.OpenUrl;
+        UpdateClickActionState();
+    }
+
+    /// <summary>
+    /// 切换为“打开应用”动作，并刷新界面状态。
+    /// </summary>
+    private void OpenApplicationActionRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedClickActionType = TileClickActionType.OpenApplication;
+        UpdateClickActionState();
+    }
+
+    /// <summary>
+    /// 当点击动作表单发生变化时，同步刷新校验结果和按钮状态。
+    /// </summary>
+    private void ClickActionInputChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateClickActionState();
+    }
+
+    /// <summary>
+    /// 选择要由磁贴点击后启动的应用文件。
+    /// </summary>
+    private void BrowseApplicationPathButton_Click(object sender, RoutedEventArgs e)
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Filter = "应用或快捷方式|*.exe;*.lnk|可执行文件|*.exe|快捷方式|*.lnk|所有文件|*.*",
+            Title = "选择磁贴点击后要启动的应用"
+        };
+
+        if (openFileDialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        _viewModel.ClickActionApplicationPath = openFileDialog.FileName;
+        if (string.IsNullOrWhiteSpace(_viewModel.ClickActionWorkingDirectory))
+        {
+            _viewModel.ClickActionWorkingDirectory = Path.GetDirectoryName(openFileDialog.FileName) ?? string.Empty;
+        }
+
+        UpdateClickActionState();
+    }
+
+    /// <summary>
+    /// 一键把工作目录填充为应用所在目录，减少用户重复输入。
+    /// </summary>
+    private void UseApplicationDirectoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_viewModel.ClickActionApplicationPath))
+        {
+            return;
+        }
+
+        _viewModel.ClickActionWorkingDirectory = Path.GetDirectoryName(_viewModel.ClickActionApplicationPath) ?? string.Empty;
+        UpdateClickActionState();
     }
 
     private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
@@ -334,6 +414,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        var clickAction = BuildCurrentClickAction();
+        var clickActionValidation = TileClickActionService.Validate(clickAction);
+        if (!clickActionValidation.IsValid)
+        {
+            MessageBox.Show(this, clickActionValidation.ValidationMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         RefreshEnvironmentState();
         if (!_viewModel.IsClassicStartAvailable || !_viewModel.AreToolsAvailable)
         {
@@ -420,7 +508,8 @@ public partial class MainWindow : Window
                         RequestedSize = TileRequestSize.Medium2x2,
                         HostExePath = preparedHostExePath,
                         ShortcutPath = shortcutPath,
-                        AssetsVersion = generatedAssetSet.AssetsVersion
+                        AssetsVersion = generatedAssetSet.AssetsVersion,
+                        ClickAction = clickAction
                     };
 
                     await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
@@ -452,7 +541,8 @@ public partial class MainWindow : Window
                         RequestedSize = TileRequestSize.Medium2x2,
                         HostExePath = hostExePath,
                         ShortcutPath = predictedShortcutPath,
-                        AssetsVersion = generatedAssetSet?.AssetsVersion ?? GeneratedAssetSet.CurrentAssetsVersion
+                        AssetsVersion = generatedAssetSet?.AssetsVersion ?? GeneratedAssetSet.CurrentAssetsVersion,
+                        ClickAction = clickAction
                     };
 
                     await _applicationContext.TileRecordStore.SaveTileRecordAsync(tileRecord).ConfigureAwait(true);
@@ -493,7 +583,8 @@ public partial class MainWindow : Window
                 Title = TileIdentityBuilder.BuildBatchDisplayTitle(copiedSourcePath),
                 SourceImagePath = copiedSourcePath,
                 CreatedAtUtc = DateTimeOffset.UtcNow,
-                TileIds = batchTileIds
+                TileIds = batchTileIds,
+                DefaultClickAction = clickAction
             };
 
             await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(batchRecord).ConfigureAwait(true);
@@ -780,7 +871,8 @@ public partial class MainWindow : Window
                 Title = TileIdentityBuilder.BuildBatchDisplayTitle(exemplar.SourceImagePath),
                 SourceImagePath = exemplar.SourceImagePath,
                 CreatedAtUtc = GetRecordTimestampUtc(exemplar),
-                TileIds = groupedTileRecords.Select(tileRecord => tileRecord.TileId).ToList()
+                TileIds = groupedTileRecords.Select(tileRecord => tileRecord.TileId).ToList(),
+                DefaultClickAction = exemplar.ClickAction
             };
 
             historyItems.Add(CreateBatchHistoryItem(syntheticBatchRecord, groupedTileRecords, pinAttempts, preferredTileId));
@@ -820,6 +912,7 @@ public partial class MainWindow : Window
             : hasWarning
                 ? $"共 {tileItems.Length} 块，其中部分需要手动确认"
                 : $"共 {tileItems.Length} 块，已完成固定";
+        var actionSummary = TileClickActionService.Validate(batchRecord.DefaultClickAction).SummaryText;
 
         var batchHistoryItem = new TileBatchHistoryItemViewModel
         {
@@ -832,6 +925,7 @@ public partial class MainWindow : Window
                 : newestTimestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
             SummaryText = summaryText,
             SummaryBrush = summaryBrush,
+            ActionSummaryText = actionSummary,
             TileCountText = $"{tileItems.Length} 块",
             SuccessCount = successCount,
             FailureCount = failureCount,
@@ -859,6 +953,7 @@ public partial class MainWindow : Window
         var detailBrush = pinAttempt is null
             ? Brushes.DarkSlateBlue
             : MapStatusBrush(pinAttempt.Status);
+        var actionDetailText = BuildTileActionDetailText(tileRecord.ClickAction);
         var previewPath = tileRecord.PreviewImagePath;
         var thumbnailImage = !string.IsNullOrWhiteSpace(previewPath)
             ? TryCreateBitmapImage(previewPath, 160)
@@ -874,6 +969,7 @@ public partial class MainWindow : Window
             AttemptedAtText = attemptedAtText,
             DetailText = detailText,
             DetailBrush = detailBrush,
+            ActionDetailText = actionDetailText,
             SortTimestampUtc = sortTimestampUtc,
             TileRecord = tileRecord,
             PinAttempt = pinAttempt
@@ -917,11 +1013,13 @@ public partial class MainWindow : Window
                     CreatedAtUtc = existingBatchRecord.CreatedAtUtc == DateTimeOffset.MinValue
                         ? GetRecordTimestampUtc(exemplar)
                         : existingBatchRecord.CreatedAtUtc,
-                    TileIds = tileIds
+                    TileIds = tileIds,
+                    DefaultClickAction = existingBatchRecord.DefaultClickAction ?? exemplar.ClickAction
                 };
 
                 if (!existingBatchRecord.TileIds.SequenceEqual(tileIds, StringComparer.Ordinal) ||
-                    !string.Equals(existingBatchRecord.SourceImagePath, updatedBatchRecord.SourceImagePath, StringComparison.Ordinal))
+                    !string.Equals(existingBatchRecord.SourceImagePath, updatedBatchRecord.SourceImagePath, StringComparison.Ordinal) ||
+                    !AreTileClickActionsEqual(existingBatchRecord.DefaultClickAction, updatedBatchRecord.DefaultClickAction))
                 {
                     await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(updatedBatchRecord).ConfigureAwait(true);
                 }
@@ -934,7 +1032,8 @@ public partial class MainWindow : Window
                     Title = TileIdentityBuilder.BuildBatchDisplayTitle(exemplar.SourceImagePath),
                     SourceImagePath = exemplar.SourceImagePath,
                     CreatedAtUtc = GetRecordTimestampUtc(exemplar),
-                    TileIds = tileIds
+                    TileIds = tileIds,
+                    DefaultClickAction = exemplar.ClickAction
                 };
                 await _applicationContext.TileRecordStore.SaveTileBatchRecordAsync(createdBatchRecord).ConfigureAwait(true);
             }
@@ -1238,16 +1337,32 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 根据当前界面输入重算点击动作的摘要、提示和固定按钮状态。
+    /// </summary>
+    private void UpdateClickActionState()
+    {
+        var validationResult = TileClickActionService.Validate(BuildCurrentClickAction());
+        _viewModel.ClickActionSummaryText = validationResult.SummaryText;
+        _viewModel.ClickActionValidationText = validationResult.ValidationMessage;
+        _viewModel.ClickActionValidationBrush = validationResult.IsValid
+            ? Brushes.DarkSlateBlue
+            : Brushes.Firebrick;
+        RefreshActionButtonsState();
+    }
+
     private void RefreshActionButtonsState()
     {
         var activeCellsCount = GetActiveCells().Count;
         var environmentReady = _viewModel.IsClassicStartAvailable && _viewModel.AreToolsAvailable;
+        var clickActionValidation = TileClickActionService.Validate(BuildCurrentClickAction());
 
         _viewModel.CanPinImage =
             !_viewModel.IsBusy &&
             !string.IsNullOrWhiteSpace(_selectedImagePath) &&
             activeCellsCount > 0 &&
-            environmentReady;
+            environmentReady &&
+            clickActionValidation.IsValid;
         _viewModel.CanOpenHistory = !_viewModel.IsBusy;
         _viewModel.CanClearSelection = !_viewModel.IsBusy && activeCellsCount > 0;
         _viewModel.CanClearAllPinnedTiles = !_viewModel.IsBusy && environmentReady && _viewModel.HasHistoryItems;
@@ -1375,16 +1490,144 @@ public partial class MainWindow : Window
         try
         {
             // 使用系统默认浏览器打开发布页，避免把下载逻辑塞回应用内部。
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            });
+            LaunchUrl(url);
         }
         catch (Exception exception)
         {
             MessageBox.Show(this, $"打开发布页失败：{exception.Message}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>
+    /// 根据当前界面输入生成即将保存的点击动作配置。
+    /// </summary>
+    /// <returns>规范化后的点击动作；如果用户未设置，则返回 null。</returns>
+    private TileClickAction? BuildCurrentClickAction()
+    {
+        var action = _viewModel.SelectedClickActionType switch
+        {
+            TileClickActionType.OpenUrl => new TileClickAction
+            {
+                Type = TileClickActionType.OpenUrl,
+                Url = _viewModel.ClickActionUrl
+            },
+            TileClickActionType.OpenApplication => new TileClickAction
+            {
+                Type = TileClickActionType.OpenApplication,
+                ApplicationPath = _viewModel.ClickActionApplicationPath,
+                Arguments = _viewModel.ClickActionArguments,
+                WorkingDirectory = _viewModel.ClickActionWorkingDirectory
+            },
+            _ => new TileClickAction
+            {
+                Type = TileClickActionType.None
+            }
+        };
+
+        return TileClickActionService.Normalize(action);
+    }
+
+    /// <summary>
+    /// 尝试执行磁贴绑定的点击动作；执行成功时直接返回 true。
+    /// </summary>
+    /// <param name="tileRecord">当前被点击的磁贴记录。</param>
+    /// <returns>若动作已成功执行则返回 true，否则返回 false 以便继续回退到历史定位。</returns>
+    private async Task<bool> TryExecuteTileClickActionAsync(TileRecord tileRecord)
+    {
+        var clickAction = TileClickActionService.Normalize(tileRecord.ClickAction);
+        if (clickAction is null && !string.IsNullOrWhiteSpace(tileRecord.BatchId))
+        {
+            var batchRecord = await _applicationContext.TileRecordStore
+                .LoadTileBatchRecordAsync(tileRecord.BatchId)
+                .ConfigureAwait(true);
+            clickAction = TileClickActionService.Normalize(batchRecord?.DefaultClickAction);
+        }
+
+        if (clickAction is null)
+        {
+            return false;
+        }
+
+        var validationResult = TileClickActionService.Validate(clickAction);
+        if (!validationResult.IsValid)
+        {
+            ApplyPanelMode(MainPanelMode.History);
+            await RefreshHistoryAsync(tileRecord.TileId).ConfigureAwait(true);
+            SetStatus("已打开 WinTiles，但该磁贴的点击动作配置无效。", Brushes.DarkGoldenrod);
+            MessageBox.Show(this, validationResult.ValidationMessage, "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true;
+        }
+
+        try
+        {
+            switch (clickAction.Type)
+            {
+                case TileClickActionType.OpenUrl:
+                    LaunchUrl(clickAction.Url!);
+                    Application.Current.Shutdown();
+                    return true;
+                case TileClickActionType.OpenApplication:
+                    LaunchApplication(clickAction);
+                    Application.Current.Shutdown();
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        catch (Exception exception)
+        {
+            ApplyPanelMode(MainPanelMode.History);
+            await RefreshHistoryAsync(tileRecord.TileId).ConfigureAwait(true);
+            SetStatus("已打开 WinTiles，但执行点击动作失败。", Brushes.DarkGoldenrod);
+            MessageBox.Show(this, $"执行点击动作失败：{exception.Message}", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 启动磁贴点击后绑定的应用目标。
+    /// </summary>
+    /// <param name="action">已经通过基础校验的应用动作配置。</param>
+    private static void LaunchApplication(TileClickAction action)
+    {
+        var applicationPath = action.ApplicationPath?.Trim();
+        if (string.IsNullOrWhiteSpace(applicationPath) || !File.Exists(applicationPath))
+        {
+            throw new FileNotFoundException("目标应用不存在，请重新配置后再尝试。", applicationPath);
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = applicationPath,
+            Arguments = action.Arguments ?? string.Empty,
+            UseShellExecute = true
+        };
+
+        var workingDirectory = action.WorkingDirectory?.Trim();
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            startInfo.WorkingDirectory = workingDirectory;
+        }
+
+        Process.Start(startInfo);
+    }
+
+    /// <summary>
+    /// 使用系统默认浏览器打开网页地址。
+    /// </summary>
+    /// <param name="url">待打开的网址。</param>
+    private static void LaunchUrl(string url)
+    {
+        if (!TileClickActionService.IsSupportedUrl(url))
+        {
+            throw new InvalidOperationException("网页地址无效，首版仅支持 http:// 或 https:// 链接。");
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = url,
+            UseShellExecute = true
+        });
     }
 
     private string CopySourceImageToBatchDirectory(string batchDirectory, string sourceImagePath)
@@ -1431,6 +1674,41 @@ public partial class MainWindow : Window
             appUserModelId,
             shortcutIconPath,
             manifestPath);
+    }
+
+    /// <summary>
+    /// 判断两个点击动作配置是否等价，避免批次修复时反复无意义改写。
+    /// </summary>
+    private static bool AreTileClickActionsEqual(TileClickAction? left, TileClickAction? right)
+    {
+        var normalizedLeft = TileClickActionService.Normalize(left);
+        var normalizedRight = TileClickActionService.Normalize(right);
+
+        if (normalizedLeft is null || normalizedRight is null)
+        {
+            return normalizedLeft is null && normalizedRight is null;
+        }
+
+        return normalizedLeft.Type == normalizedRight.Type
+               && string.Equals(normalizedLeft.Url, normalizedRight.Url, StringComparison.Ordinal)
+               && string.Equals(normalizedLeft.ApplicationPath, normalizedRight.ApplicationPath, StringComparison.Ordinal)
+               && string.Equals(normalizedLeft.Arguments, normalizedRight.Arguments, StringComparison.Ordinal)
+               && string.Equals(normalizedLeft.WorkingDirectory, normalizedRight.WorkingDirectory, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 生成历史列表里显示的点击动作说明。
+    /// </summary>
+    /// <param name="clickAction">磁贴保存的点击动作。</param>
+    /// <returns>适合直接展示的中文说明。</returns>
+    private static string BuildTileActionDetailText(TileClickAction? clickAction)
+    {
+        var summaryText = TileClickActionService.Validate(clickAction).SummaryText;
+        const string prefix = "点击后：";
+        var readableSummary = summaryText.StartsWith(prefix, StringComparison.Ordinal)
+            ? summaryText[prefix.Length..]
+            : summaryText;
+        return $"点击动作：{readableSummary}";
     }
 
     private static void DeleteFileIfExists(string path)

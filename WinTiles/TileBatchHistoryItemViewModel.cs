@@ -21,6 +21,8 @@ public sealed class TileBatchHistoryItemViewModel : ViewModelBase
 
     public required Brush SummaryBrush { get; init; }
 
+    public required string ActionSummaryText { get; init; }
+
     public required string TileCountText { get; init; }
 
     public required int SuccessCount { get; init; }

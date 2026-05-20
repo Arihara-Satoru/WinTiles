@@ -65,6 +65,64 @@ public sealed class TileRecordStoreTests : IDisposable
         Assert.Equal(tileRecord.TileId, loadedRecords[0].TileId);
     }
 
+    [Fact]
+    public async Task LoadTileRecordAsync_old_record_without_click_action_is_backward_compatible()
+    {
+        var store = new TileRecordStore(_workingDirectory);
+        var tileDirectory = store.CreateTileDirectory("legacy-tile");
+        var recordPath = Path.Combine(tileDirectory, "tile-record.json");
+
+        await File.WriteAllTextAsync(
+            recordPath,
+            """
+            {
+              "TileId": "legacy-tile",
+              "SourceImagePath": "D:\\Images\\legacy.png",
+              "BatchId": "legacy-batch",
+              "TileIndex": 0,
+              "GridRow": 0,
+              "GridColumn": 0,
+              "PreviewImagePath": "D:\\Images\\preview.png",
+              "RequestedSize": 1,
+              "HostExePath": "D:\\Tiles\\legacy\\TileHost.exe",
+              "ShortcutPath": "D:\\Tiles\\legacy\\tile.lnk",
+              "AssetsVersion": "1"
+            }
+            """);
+
+        var loadedRecord = await store.LoadTileRecordAsync("legacy-tile");
+
+        Assert.NotNull(loadedRecord);
+        Assert.Null(loadedRecord.ClickAction);
+    }
+
+    [Fact]
+    public async Task SaveTileBatchRecordAsync_round_trips_default_click_action()
+    {
+        var store = new TileRecordStore(_workingDirectory);
+        var batchRecord = new TileBatchRecord
+        {
+            BatchId = "batch-click-action",
+            Title = "测试批次",
+            SourceImagePath = @"D:\Images\sample.png",
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            TileIds = ["tile-1", "tile-2"],
+            DefaultClickAction = new TileClickAction
+            {
+                Type = TileClickActionType.OpenUrl,
+                Url = "https://example.com"
+            }
+        };
+
+        await store.SaveTileBatchRecordAsync(batchRecord);
+        var loadedRecord = await store.LoadTileBatchRecordAsync(batchRecord.BatchId);
+
+        Assert.NotNull(loadedRecord);
+        Assert.NotNull(loadedRecord.DefaultClickAction);
+        Assert.Equal(TileClickActionType.OpenUrl, loadedRecord.DefaultClickAction.Type);
+        Assert.Equal("https://example.com", loadedRecord.DefaultClickAction.Url);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_workingDirectory))

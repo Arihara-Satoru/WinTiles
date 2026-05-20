@@ -162,6 +162,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <Grid>
@@ -417,6 +418,163 @@
                                 </Button>
                             </Grid>
                         </Border>
+
+                        <Border Grid.Row="3"
+                                Margin="0,20,0,0"
+                                Padding="18"
+                                Background="{StaticResource InsetSurfaceBrush}"
+                                BorderBrush="{StaticResource InsetBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="24">
+                            <StackPanel>
+                                <TextBlock FontSize="18"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource PrimaryTextBrush}"
+                                           Text="点击动作" />
+                                <TextBlock Margin="0,8,0,0"
+                                           FontSize="13"
+                                           Foreground="{StaticResource SecondaryTextBrush}"
+                                           Text="固定后的这一批图片磁贴会共用同一个点击动作；不设置时，点击磁贴会回到 WinTiles 历史记录。"
+                                           TextWrapping="Wrap" />
+
+                                <StackPanel Margin="0,16,0,0"
+                                            Orientation="Horizontal">
+                                    <RadioButton GroupName="TileClickActionGroup"
+                                                 Margin="0,0,20,0"
+                                                 VerticalAlignment="Center"
+                                                 IsChecked="{Binding IsNoClickActionSelected, Mode=OneWay}"
+                                                 Checked="NoClickActionRadioButton_Checked"
+                                                 Content="不设置" />
+                                    <RadioButton GroupName="TileClickActionGroup"
+                                                 Margin="0,0,20,0"
+                                                 VerticalAlignment="Center"
+                                                 IsChecked="{Binding IsOpenUrlActionSelected, Mode=OneWay}"
+                                                 Checked="OpenUrlActionRadioButton_Checked"
+                                                 Content="打开网页" />
+                                    <RadioButton GroupName="TileClickActionGroup"
+                                                 VerticalAlignment="Center"
+                                                 IsChecked="{Binding IsOpenApplicationActionSelected, Mode=OneWay}"
+                                                 Checked="OpenApplicationActionRadioButton_Checked"
+                                                 Content="打开应用" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,16,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOpenUrlActionSelected}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="网页地址" />
+                                    <TextBox Margin="0,8,0,0"
+                                             Padding="14,10"
+                                             FontSize="14"
+                                             Text="{Binding ClickActionUrl, UpdateSourceTrigger=PropertyChanged}"
+                                             TextChanged="ClickActionInputChanged" />
+                                    <TextBlock Margin="0,8,0,0"
+                                               FontSize="12"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="仅支持 http:// 或 https:// 链接。"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel Margin="0,16,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOpenApplicationActionSelected}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="应用路径" />
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="132" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Padding="14,10"
+                                                 FontSize="14"
+                                                 Text="{Binding ClickActionApplicationPath, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextChanged="ClickActionInputChanged" />
+                                        <Button Grid.Column="2"
+                                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                                Click="BrowseApplicationPathButton_Click">
+                                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                                       Text="浏览..." />
+                                        </Button>
+                                    </Grid>
+
+                                    <TextBlock Margin="0,14,0,0"
+                                               FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="启动参数" />
+                                    <TextBox Margin="0,8,0,0"
+                                             Padding="14,10"
+                                             FontSize="14"
+                                             Text="{Binding ClickActionArguments, UpdateSourceTrigger=PropertyChanged}"
+                                             TextChanged="ClickActionInputChanged" />
+
+                                    <TextBlock Margin="0,14,0,0"
+                                               FontSize="13"
+                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                               Text="工作目录" />
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="176" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Padding="14,10"
+                                                 FontSize="14"
+                                                 Text="{Binding ClickActionWorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextChanged="ClickActionInputChanged" />
+                                        <Button Grid.Column="2"
+                                                Style="{StaticResource SecondaryActionButtonStyle}"
+                                                Click="UseApplicationDirectoryButton_Click">
+                                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
+                                                       Text="使用应用目录" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+
+                                <Border Margin="0,16,0,0"
+                                        Padding="14,12"
+                                        Background="{StaticResource PrimaryAccentSoftBrush}"
+                                        BorderBrush="#D6E4FB"
+                                        BorderThickness="1"
+                                        CornerRadius="18">
+                                    <StackPanel>
+                                        <TextBlock FontSize="13"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="动作摘要预览" />
+                                        <TextBlock Margin="0,8,0,0"
+                                                   FontSize="14"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                                   Text="{Binding ClickActionSummaryText}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,8,0,0"
+                                                   FontSize="13"
+                                                   Foreground="{Binding ClickActionValidationBrush}"
+                                                   Text="{Binding ClickActionValidationText}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <Grid Grid.Row="0"
@@ -566,6 +724,11 @@
                                                                                Foreground="{Binding SummaryBrush}"
                                                                                Text="{Binding SummaryText}"
                                                                                TextWrapping="Wrap" />
+                                                                    <TextBlock Margin="0,6,0,0"
+                                                                               FontSize="13"
+                                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                                               Text="{Binding ActionSummaryText}"
+                                                                               TextWrapping="Wrap" />
                                                                 </StackPanel>
 
                                                                 <StackPanel Grid.Column="4"
@@ -668,6 +831,11 @@
                                                                                                FontSize="13"
                                                                                                Foreground="{Binding DetailBrush}"
                                                                                                Text="{Binding DetailText}"
+                                                                                               TextWrapping="Wrap" />
+                                                                                    <TextBlock Margin="0,6,0,0"
+                                                                                               FontSize="13"
+                                                                                               Foreground="{StaticResource SecondaryTextBrush}"
+                                                                                               Text="{Binding ActionDetailText}"
                                                                                                TextWrapping="Wrap" />
                                                                                 </StackPanel>
 

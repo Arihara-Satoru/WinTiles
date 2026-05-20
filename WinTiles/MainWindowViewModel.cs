@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using WinTiles.Core.Models;
 
 namespace WinTiles;
 
@@ -32,6 +33,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _selectionSummaryText = "尚未启用裁切区域";
     private string _zoomText = "缩放 100%";
     private string _updateStatusText = "版本检查未开始。";
+    private TileClickActionType _selectedClickActionType;
+    private string _clickActionUrl = string.Empty;
+    private string _clickActionApplicationPath = string.Empty;
+    private string _clickActionArguments = string.Empty;
+    private string _clickActionWorkingDirectory = string.Empty;
+    private string _clickActionSummaryText = "点击后：打开 WinTiles 并定位到对应磁贴记录";
+    private string _clickActionValidationText = "当前未设置点击动作，点击磁贴时会回到 WinTiles 历史记录。";
+    private Brush _clickActionValidationBrush = Brushes.DarkSlateBlue;
     private double _cropScale = 1d;
     private double _minimumCropScale = 1d;
     private double _cropOffsetX;
@@ -207,6 +216,68 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _updateStatusText;
         set => SetField(ref _updateStatusText, value);
+    }
+
+    public TileClickActionType SelectedClickActionType
+    {
+        get => _selectedClickActionType;
+        set
+        {
+            if (SetField(ref _selectedClickActionType, value))
+            {
+                OnPropertyChanged(nameof(IsNoClickActionSelected));
+                OnPropertyChanged(nameof(IsOpenUrlActionSelected));
+                OnPropertyChanged(nameof(IsOpenApplicationActionSelected));
+            }
+        }
+    }
+
+    public bool IsNoClickActionSelected => SelectedClickActionType == TileClickActionType.None;
+
+    public bool IsOpenUrlActionSelected => SelectedClickActionType == TileClickActionType.OpenUrl;
+
+    public bool IsOpenApplicationActionSelected => SelectedClickActionType == TileClickActionType.OpenApplication;
+
+    public string ClickActionUrl
+    {
+        get => _clickActionUrl;
+        set => SetField(ref _clickActionUrl, value);
+    }
+
+    public string ClickActionApplicationPath
+    {
+        get => _clickActionApplicationPath;
+        set => SetField(ref _clickActionApplicationPath, value);
+    }
+
+    public string ClickActionArguments
+    {
+        get => _clickActionArguments;
+        set => SetField(ref _clickActionArguments, value);
+    }
+
+    public string ClickActionWorkingDirectory
+    {
+        get => _clickActionWorkingDirectory;
+        set => SetField(ref _clickActionWorkingDirectory, value);
+    }
+
+    public string ClickActionSummaryText
+    {
+        get => _clickActionSummaryText;
+        set => SetField(ref _clickActionSummaryText, value);
+    }
+
+    public string ClickActionValidationText
+    {
+        get => _clickActionValidationText;
+        set => SetField(ref _clickActionValidationText, value);
+    }
+
+    public Brush ClickActionValidationBrush
+    {
+        get => _clickActionValidationBrush;
+        set => SetField(ref _clickActionValidationBrush, value);
     }
 
     public double CropScale

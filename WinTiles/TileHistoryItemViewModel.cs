@@ -21,6 +21,8 @@ public sealed class TileHistoryItemViewModel
 
     public required Brush DetailBrush { get; init; }
 
+    public required string ActionDetailText { get; init; }
+
     public required DateTimeOffset SortTimestampUtc { get; init; }
 
     public required TileRecord TileRecord { get; init; }
