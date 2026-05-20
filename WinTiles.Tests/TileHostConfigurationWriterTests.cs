@@ -1,4 +1,5 @@
 using System.Text;
+using WinTiles.Core.Models;
 using WinTiles.Core.Services;
 
 namespace WinTiles.Tests;
@@ -12,8 +13,15 @@ public sealed class TileHostConfigurationWriterTests : IDisposable
     {
         var writer = new TileHostConfigurationWriter();
         var tileDirectory = Path.Combine(_workingDirectory, "tile-a");
+        var clickAction = new TileClickAction
+        {
+            Type = TileClickActionType.OpenApplication,
+            ApplicationPath = @"D:\Apps\Notepad.exe",
+            Arguments = "--example",
+            WorkingDirectory = @"D:\Apps"
+        };
 
-        var configPath = writer.Write(tileDirectory, @"D:\Apps\WinTiles.exe", "tile-a");
+        var configPath = writer.Write(tileDirectory, @"D:\Apps\WinTiles.exe", "tile-a", clickAction);
 
         Assert.True(File.Exists(configPath));
 
@@ -26,6 +34,10 @@ public sealed class TileHostConfigurationWriterTests : IDisposable
         Assert.Contains("[TileHost]", fileContent, StringComparison.Ordinal);
         Assert.Contains("MainExecutable=D:\\Apps\\WinTiles.exe", fileContent, StringComparison.Ordinal);
         Assert.Contains("TileId=tile-a", fileContent, StringComparison.Ordinal);
+        Assert.Contains("ClickActionType=2", fileContent, StringComparison.Ordinal);
+        Assert.Contains("ClickActionApplicationPath=D:\\Apps\\Notepad.exe", fileContent, StringComparison.Ordinal);
+        Assert.Contains("ClickActionArguments=--example", fileContent, StringComparison.Ordinal);
+        Assert.Contains("ClickActionWorkingDirectory=D:\\Apps", fileContent, StringComparison.Ordinal);
     }
 
     public void Dispose()

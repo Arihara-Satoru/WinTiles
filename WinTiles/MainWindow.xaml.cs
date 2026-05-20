@@ -52,6 +52,7 @@ public partial class MainWindow : Window
         UpdateSelectionSummary();
         RefreshActionButtonsState();
 
+        await RepairTileHostConfigurationsAsync().ConfigureAwait(true);
         await RefreshHistoryAsync(startupTileId).ConfigureAwait(true);
         UpdateCropBoardLayout();
 
@@ -480,7 +481,7 @@ public partial class MainWindow : Window
                         assetsDirectory,
                         exportRegion.SourceCropBounds);
 
-                    var preparedHostExePath = PrepareTileHost(tileDirectory, tileId);
+                    var preparedHostExePath = PrepareTileHost(tileDirectory, tileId, clickAction);
                     File.WriteAllText(
                         manifestPath,
                         _applicationContext.VisualElementsManifestBuilder.Build());
@@ -1653,7 +1654,14 @@ public partial class MainWindow : Window
         return copiedSourcePath;
     }
 
-    private string PrepareTileHost(string tileDirectory, string tileId)
+    /// <summary>
+    /// 为当前磁贴复制独立宿主，并写入对应的点击动作配置。
+    /// </summary>
+    /// <param name="tileDirectory">当前磁贴的数据目录。</param>
+    /// <param name="tileId">当前磁贴唯一标识。</param>
+    /// <param name="clickAction">当前磁贴绑定的点击动作。</param>
+    /// <returns>生成后的宿主程序完整路径。</returns>
+    private string PrepareTileHost(string tileDirectory, string tileId, TileClickAction? clickAction)
     {
         if (!File.Exists(_applicationContext.TileHostTemplatePath))
         {
@@ -1663,9 +1671,79 @@ public partial class MainWindow : Window
         var hostExePath = Path.Combine(tileDirectory, "TileHost.exe");
         File.Copy(_applicationContext.TileHostTemplatePath, hostExePath, overwrite: true);
 
-        // 每个磁贴目录都会落一份独立 ini，保证点击磁贴时能准确回流到主程序。
-        _applicationContext.TileHostConfigurationWriter.Write(tileDirectory, _applicationContext.MainExecutablePath, tileId);
+        // 每个磁贴目录都会落一份独立 ini，宿主会优先按这里的点击动作直接执行。
+        _applicationContext.TileHostConfigurationWriter.Write(
+            tileDirectory,
+            _applicationContext.MainExecutablePath,
+            tileId,
+            clickAction);
         return hostExePath;
+    }
+
+    /// <summary>
+    /// 启动时批量修复已有磁贴的宿主配置，保证旧磁贴也能直接执行点击动作。
+    /// </summary>
+    /// <returns>异步修复任务。</returns>
+    private async Task RepairTileHostConfigurationsAsync()
+    {
+        var tileRecords = await _applicationContext.TileRecordStore.LoadAllTileRecordsAsync().ConfigureAwait(true);
+        if (tileRecords.Count == 0)
+        {
+            return;
+        }
+
+        var batchRecords = await _applicationContext.TileRecordStore.LoadAllTileBatchRecordsAsync().ConfigureAwait(true);
+        var batchClickActions = batchRecords.ToDictionary(
+            batchRecord => batchRecord.BatchId,
+            batchRecord => TileClickActionService.Normalize(batchRecord.DefaultClickAction),
+            StringComparer.Ordinal);
+
+        foreach (var tileRecord in tileRecords)
+        {
+            if (string.IsNullOrWhiteSpace(tileRecord.HostExePath))
+            {
+                continue;
+            }
+
+            var tileDirectory = Path.GetDirectoryName(tileRecord.HostExePath);
+            if (string.IsNullOrWhiteSpace(tileDirectory) || !Directory.Exists(tileDirectory))
+            {
+                continue;
+            }
+
+            var clickAction = ResolveEffectiveTileClickAction(tileRecord, batchClickActions);
+            _applicationContext.TileHostConfigurationWriter.Write(
+                tileDirectory,
+                _applicationContext.MainExecutablePath,
+                tileRecord.TileId,
+                clickAction);
+        }
+    }
+
+    /// <summary>
+    /// 解析磁贴最终应使用的点击动作，优先取磁贴自身配置，再回退到批次默认配置。
+    /// </summary>
+    /// <param name="tileRecord">磁贴记录。</param>
+    /// <param name="batchClickActions">批次默认点击动作字典。</param>
+    /// <returns>最终用于宿主执行的点击动作；若未配置则返回 null。</returns>
+    private static TileClickAction? ResolveEffectiveTileClickAction(
+        TileRecord tileRecord,
+        IReadOnlyDictionary<string, TileClickAction?> batchClickActions)
+    {
+        var clickAction = TileClickActionService.Normalize(tileRecord.ClickAction);
+        if (clickAction is not null)
+        {
+            return clickAction;
+        }
+
+        if (string.IsNullOrWhiteSpace(tileRecord.BatchId))
+        {
+            return null;
+        }
+
+        return batchClickActions.TryGetValue(tileRecord.BatchId, out var batchClickAction)
+            ? batchClickAction
+            : null;
     }
 
     private string CreateStartMenuShortcut(
