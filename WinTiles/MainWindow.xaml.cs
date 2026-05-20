@@ -1299,6 +1299,8 @@ public partial class MainWindow : Window
             .ThenBy(cell => cell.Column)
             .ToArray();
 
+        // 统一维护选中数量，供右侧设置卡片直接绑定显示。
+        _viewModel.ActiveCropCellCount = activeCells.Length;
         _viewModel.SelectionSummaryText = activeCells.Length == 0
             ? "尚未启用裁切区域"
             : $"已启用 {activeCells.Length} / 25 个区域";

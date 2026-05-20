@@ -162,7 +162,6 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <Grid>
@@ -179,247 +178,284 @@
                             </StackPanel>
                         </Grid>
 
-                        <Grid x:Name="CropBoardHost"
-                              Grid.Row="1"
-                              Margin="0,24,0,0"
-                              SizeChanged="CropBoardHost_SizeChanged">
-                            <Border x:Name="CropBoardBorder"
-                                    Width="{Binding CropBoardSize}"
-                                    Height="{Binding CropBoardSize}"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Background="#EEF5FD"
-                                    BorderBrush="#D5E1F0"
+                        <Grid Grid.Row="1"
+                              Margin="0,24,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3.2*" />
+                                <ColumnDefinition Width="2.2*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                    Margin="0,0,20,0"
+                                    Padding="18"
+                                    Background="{StaticResource InsetSurfaceBrush}"
+                                    BorderBrush="{StaticResource InsetBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="0"
-                                    ClipToBounds="True"
-                                    Cursor="SizeAll"
-                                    MouseLeftButtonDown="CropBoardBorder_MouseLeftButtonDown"
-                                    MouseLeftButtonUp="CropBoardBorder_MouseLeftButtonUp"
-                                    MouseMove="CropBoardBorder_MouseMove"
-                                    MouseLeave="CropBoardBorder_MouseLeave"
-                                    PreviewMouseWheel="CropBoardBorder_PreviewMouseWheel">
-                                <Grid Background="#EEF5FD">
-                                    <Canvas x:Name="CropImageCanvas"
-                                            ClipToBounds="True">
-                                        <Image x:Name="CropImageElement"
-                                               Source="{Binding CropImage}"
-                                               Stretch="Fill"
-                                               RenderOptions.BitmapScalingMode="HighQuality">
-                                            <Image.RenderTransform>
-                                                <TransformGroup>
-                                                    <ScaleTransform x:Name="CropImageScaleTransform" />
-                                                    <TranslateTransform x:Name="CropImageTranslateTransform" />
-                                                </TransformGroup>
-                                            </Image.RenderTransform>
-                                        </Image>
-                                    </Canvas>
+                                    CornerRadius="24">
+                                <Grid x:Name="CropBoardHost"
+                                      ClipToBounds="True"
+                                      SizeChanged="CropBoardHost_SizeChanged">
+                                    <Border x:Name="CropBoardBorder"
+                                            Width="{Binding CropBoardSize}"
+                                            Height="{Binding CropBoardSize}"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Background="#EEF5FD"
+                                            BorderBrush="#D5E1F0"
+                                            BorderThickness="1"
+                                            CornerRadius="0"
+                                            ClipToBounds="True"
+                                            Cursor="SizeAll"
+                                            MouseLeftButtonDown="CropBoardBorder_MouseLeftButtonDown"
+                                            MouseLeftButtonUp="CropBoardBorder_MouseLeftButtonUp"
+                                            MouseMove="CropBoardBorder_MouseMove"
+                                            MouseLeave="CropBoardBorder_MouseLeave"
+                                            PreviewMouseWheel="CropBoardBorder_PreviewMouseWheel">
+                                        <Grid Background="#EEF5FD">
+                                            <Canvas x:Name="CropImageCanvas"
+                                                    ClipToBounds="True">
+                                                <Image x:Name="CropImageElement"
+                                                       Source="{Binding CropImage}"
+                                                       Stretch="Fill"
+                                                       RenderOptions.BitmapScalingMode="HighQuality">
+                                                    <Image.RenderTransform>
+                                                        <TransformGroup>
+                                                            <ScaleTransform x:Name="CropImageScaleTransform" />
+                                                            <TranslateTransform x:Name="CropImageTranslateTransform" />
+                                                        </TransformGroup>
+                                                    </Image.RenderTransform>
+                                                </Image>
+                                            </Canvas>
 
-                                    <ItemsControl x:Name="CropCellsOverlaySource"
-                                                  ItemsSource="{Binding CropCells}"
-                                                  IsHitTestVisible="False">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <Canvas />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemContainerStyle>
-                                            <Style TargetType="ContentPresenter">
-                                                <Setter Property="Canvas.Left"
-                                                        Value="{Binding Left}" />
-                                                <Setter Property="Canvas.Top"
-                                                        Value="{Binding Top}" />
-                                            </Style>
-                                        </ItemsControl.ItemContainerStyle>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Width="{Binding Size}"
-                                                      Height="{Binding Size}">
-                                                    <Rectangle x:Name="InactiveCell"
-                                                               RadiusX="0"
-                                                               RadiusY="0"
-                                                               Fill="#F9FCFFDD"
-                                                               Stroke="#C9D8EC"
-                                                               StrokeThickness="1.5"
-                                                               StrokeDashArray="7 5" />
-                                                    <Border x:Name="ActiveCell"
-                                                            Background="#182F7DFF"
-                                                            BorderBrush="#6BA7FF"
-                                                            BorderThickness="2"
-                                                            CornerRadius="0"
-                                                            Visibility="Collapsed" />
-                                                    <TextBlock x:Name="PlusText"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               FontSize="28"
-                                                               FontWeight="Normal"
-                                                               Foreground="#79A9FF"
-                                                               Text="+" />
-                                                </Grid>
-                                                <DataTemplate.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSelected}"
-                                                                 Value="True">
-                                                        <Setter TargetName="InactiveCell"
-                                                                Property="Visibility"
-                                                                Value="Collapsed" />
-                                                        <Setter TargetName="PlusText"
-                                                                Property="Visibility"
-                                                                Value="Collapsed" />
-                                                        <Setter TargetName="ActiveCell"
-                                                                Property="Visibility"
-                                                                Value="Visible" />
-                                                    </DataTrigger>
-                                                </DataTemplate.Triggers>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <Grid IsHitTestVisible="False">
-                                        <Grid.Style>
-                                            <Style TargetType="Grid">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding HasCropImage}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Grid.Style>
-                                        <!-- 空状态下让整块裁切板呈现类似 Windows 11 亚克力的覆盖层，并保留底层网格的模糊轮廓。 -->
-                                        <Grid>
-                                            <Rectangle>
-                                                <Rectangle.Fill>
-                                                    <VisualBrush Visual="{Binding ElementName=CropCellsOverlaySource}"
-                                                                 Stretch="Fill" />
-                                                </Rectangle.Fill>
-                                                <Rectangle.Effect>
-                                                    <BlurEffect Radius="24"
-                                                                RenderingBias="Quality" />
-                                                </Rectangle.Effect>
-                                            </Rectangle>
-                                            <Rectangle>
-                                                <Rectangle.Fill>
-                                                    <LinearGradientBrush StartPoint="0,0"
-                                                                         EndPoint="1,1">
-                                                        <GradientStop Offset="0"
-                                                                      Color="#F2FAFFFF" />
-                                                        <GradientStop Offset="0.42"
-                                                                      Color="#E9F5FFEE" />
-                                                        <GradientStop Offset="1"
-                                                                      Color="#D9EDFCDD" />
-                                                    </LinearGradientBrush>
-                                                </Rectangle.Fill>
-                                            </Rectangle>
-                                            <Border Background="#12FFFFFF"
-                                                    BorderBrush="#A8FFFFFF"
-                                                    BorderThickness="1" />
-                                            <Border Margin="10"
-                                                    Background="#14FFFFFF"
-                                                    BorderBrush="#34FFFFFF"
-                                                    BorderThickness="1" />
-
-                                            <StackPanel HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center">
-                                                <Border Width="92"
-                                                        Height="92"
-                                                        HorizontalAlignment="Center"
-                                                        Background="#CCEEF5FF"
-                                                        BorderBrush="#C8FFFFFF"
-                                                        BorderThickness="1"
-                                                        CornerRadius="26">
-                                                    <Border.Effect>
-                                                        <DropShadowEffect BlurRadius="18"
-                                                                          ShadowDepth="0"
-                                                                          Color="#1A4A7CCF"
-                                                                          Opacity="0.28" />
-                                                    </Border.Effect>
-                                                    <Viewbox Margin="20">
-                                                        <Canvas Width="24"
-                                                                Height="24">
-                                                            <Rectangle Width="19"
-                                                                       Height="14"
-                                                                       Canvas.Left="2.5"
-                                                                       Canvas.Top="4.5"
-                                                                       RadiusX="2.8"
-                                                                       RadiusY="2.8"
-                                                                       Stroke="{StaticResource PrimaryAccentBrush}"
+                                            <ItemsControl x:Name="CropCellsOverlaySource"
+                                                          ItemsSource="{Binding CropCells}"
+                                                          IsHitTestVisible="False">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <Canvas />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemContainerStyle>
+                                                    <Style TargetType="ContentPresenter">
+                                                        <Setter Property="Canvas.Left"
+                                                                Value="{Binding Left}" />
+                                                        <Setter Property="Canvas.Top"
+                                                                Value="{Binding Top}" />
+                                                    </Style>
+                                                </ItemsControl.ItemContainerStyle>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Width="{Binding Size}"
+                                                              Height="{Binding Size}">
+                                                            <Rectangle x:Name="InactiveCell"
+                                                                       RadiusX="0"
+                                                                       RadiusY="0"
+                                                                       Fill="#F9FCFFDD"
+                                                                       Stroke="#C9D8EC"
                                                                        StrokeThickness="1.5"
-                                                                       Fill="Transparent" />
-                                                            <Ellipse Width="3"
-                                                                     Height="3"
-                                                                     Canvas.Left="6"
-                                                                     Canvas.Top="7"
-                                                                     Fill="{StaticResource PrimaryAccentBrush}" />
-                                                            <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
-                                                                      Stroke="{StaticResource PrimaryAccentBrush}"
-                                                                      StrokeThickness="1.8"
-                                                                      StrokeStartLineCap="Round"
-                                                                      StrokeEndLineCap="Round"
-                                                                      StrokeLineJoin="Round" />
-                                                        </Canvas>
-                                                    </Viewbox>
-                                                </Border>
-                                                <TextBlock Margin="0,18,0,0"
-                                                           HorizontalAlignment="Center"
-                                                           FontSize="22"
-                                                           FontWeight="Medium"
-                                                           Foreground="{StaticResource PrimaryTextBrush}"
-                                                           Text="先选择图片，再调整裁切" />
-                                                <TextBlock Margin="0,10,0,0"
-                                                           Width="340"
-                                                           HorizontalAlignment="Center"
-                                                           FontSize="15"
-                                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                                           Text="你也可以先点击某些格子启用区域，再上传图片。上传后滚轮缩放、拖拽位置都会对整张图一起生效。"
-                                                           TextAlignment="Center"
-                                                           TextWrapping="Wrap" />
-                                            </StackPanel>
+                                                                       StrokeDashArray="7 5" />
+                                                            <Border x:Name="ActiveCell"
+                                                                    Background="#182F7DFF"
+                                                                    BorderBrush="#6BA7FF"
+                                                                    BorderThickness="2"
+                                                                    CornerRadius="0"
+                                                                    Visibility="Collapsed" />
+                                                            <TextBlock x:Name="PlusText"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"
+                                                                       FontSize="28"
+                                                                       FontWeight="Normal"
+                                                                       Foreground="#79A9FF"
+                                                                       Text="+" />
+                                                        </Grid>
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}"
+                                                                         Value="True">
+                                                                <Setter TargetName="InactiveCell"
+                                                                        Property="Visibility"
+                                                                        Value="Collapsed" />
+                                                                <Setter TargetName="PlusText"
+                                                                        Property="Visibility"
+                                                                        Value="Collapsed" />
+                                                                <Setter TargetName="ActiveCell"
+                                                                        Property="Visibility"
+                                                                        Value="Visible" />
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Grid IsHitTestVisible="False">
+                                                <Grid.Style>
+                                                    <Style TargetType="Grid">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasCropImage}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Grid.Style>
+                                                <!-- 空状态下让整块裁切板呈现类似 Windows 11 亚克力的覆盖层，并保留底层网格的模糊轮廓。 -->
+                                                <Grid>
+                                                    <Rectangle>
+                                                        <Rectangle.Fill>
+                                                            <VisualBrush Visual="{Binding ElementName=CropCellsOverlaySource}"
+                                                                         Stretch="Fill" />
+                                                        </Rectangle.Fill>
+                                                        <Rectangle.Effect>
+                                                            <BlurEffect Radius="24"
+                                                                        RenderingBias="Quality" />
+                                                        </Rectangle.Effect>
+                                                    </Rectangle>
+                                                    <Rectangle>
+                                                        <Rectangle.Fill>
+                                                            <LinearGradientBrush StartPoint="0,0"
+                                                                                 EndPoint="1,1">
+                                                                <GradientStop Offset="0"
+                                                                              Color="#F2FAFFFF" />
+                                                                <GradientStop Offset="0.42"
+                                                                              Color="#E9F5FFEE" />
+                                                                <GradientStop Offset="1"
+                                                                              Color="#D9EDFCDD" />
+                                                            </LinearGradientBrush>
+                                                        </Rectangle.Fill>
+                                                    </Rectangle>
+                                                    <Border Background="#12FFFFFF"
+                                                            BorderBrush="#A8FFFFFF"
+                                                            BorderThickness="1" />
+                                                    <Border Margin="10"
+                                                            Background="#14FFFFFF"
+                                                            BorderBrush="#34FFFFFF"
+                                                            BorderThickness="1" />
+
+                                                    <StackPanel HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center">
+                                                        <Border Width="92"
+                                                                Height="92"
+                                                                HorizontalAlignment="Center"
+                                                                Background="#CCEEF5FF"
+                                                                BorderBrush="#C8FFFFFF"
+                                                                BorderThickness="1"
+                                                                CornerRadius="26">
+                                                            <Border.Effect>
+                                                                <DropShadowEffect BlurRadius="18"
+                                                                                  ShadowDepth="0"
+                                                                                  Color="#1A4A7CCF"
+                                                                                  Opacity="0.28" />
+                                                            </Border.Effect>
+                                                            <Viewbox Margin="20">
+                                                                <Canvas Width="24"
+                                                                        Height="24">
+                                                                    <Rectangle Width="19"
+                                                                               Height="14"
+                                                                               Canvas.Left="2.5"
+                                                                               Canvas.Top="4.5"
+                                                                               RadiusX="2.8"
+                                                                               RadiusY="2.8"
+                                                                               Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                               StrokeThickness="1.5"
+                                                                               Fill="Transparent" />
+                                                                    <Ellipse Width="3"
+                                                                             Height="3"
+                                                                             Canvas.Left="6"
+                                                                             Canvas.Top="7"
+                                                                             Fill="{StaticResource PrimaryAccentBrush}" />
+                                                                    <Polyline Points="5,16 9.8,11.2 13,14.2 16.3,10.6 20,16"
+                                                                              Stroke="{StaticResource PrimaryAccentBrush}"
+                                                                              StrokeThickness="1.8"
+                                                                              StrokeStartLineCap="Round"
+                                                                              StrokeEndLineCap="Round"
+                                                                              StrokeLineJoin="Round" />
+                                                                </Canvas>
+                                                            </Viewbox>
+                                                        </Border>
+                                                        <TextBlock Margin="0,18,0,0"
+                                                                   HorizontalAlignment="Center"
+                                                                   FontSize="22"
+                                                                   FontWeight="Medium"
+                                                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                                                   Text="选择图片，预览裁切效果" />
+                                                        <TextBlock Margin="0,10,0,0"
+                                                                   Width="340"
+                                                                   HorizontalAlignment="Center"
+                                                                   FontSize="15"
+                                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                                   Text="点击或拖拽图片到此处，或点击选择图片。图片将显示在这里并可进行裁切预览。"
+                                                                   TextAlignment="Center"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Grid>
                                         </Grid>
-                                    </Grid>
+                                    </Border>
                                 </Grid>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Padding="28"
+                                    Background="{StaticResource InsetSurfaceBrush}"
+                                    BorderBrush="{StaticResource InsetBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="24">
+                                <StackPanel>
+                                    <StackPanel>
+                                        <TextBlock FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource PrimaryAccentBrush}"
+                                                   Text="裁切区域设置" />
+                                        <TextBlock Margin="0,14,0,0"
+                                                   FontSize="13"
+                                                   LineHeight="22"
+                                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                                   Text="固定顺序按从上到下、从左到右；滚轮缩放到刚好铺满启用区域时会自动吸附。"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,120,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0"
+                                                    VerticalAlignment="Bottom">
+                                            <TextBlock FontSize="15"
+                                                       FontWeight="Medium"
+                                                       Foreground="{StaticResource PrimaryAccentBrush}"
+                                                       Text="{Binding SelectionSummaryText}"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Margin="0,18,0,0"
+                                                       FontSize="38"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource PrimaryAccentBrush}"
+                                                       Text="{Binding ActiveCropCellCount, StringFormat={}{0} / 25}" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                                       Text="已启用 / 总数量" />
+                                        </StackPanel>
+
+                                        <Button x:Name="ClearCropSelectionButton"
+                                                Grid.Column="1"
+                                                Width="180"
+                                                Margin="24,0,0,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Bottom"
+                                                Style="{StaticResource DangerActionButtonStyle}"
+                                                Click="ClearCropSelectionButton_Click"
+                                                IsEnabled="{Binding CanClearSelection}">
+                                            <TextBlock VerticalAlignment="Center"
+                                                       HorizontalAlignment="Center"
+                                                       Text="清空所有区域" />
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
                         </Grid>
 
                         <Border Grid.Row="2"
-                                Margin="0,20,0,0"
-                                Padding="18"
-                                Background="{StaticResource InsetSurfaceBrush}"
-                                BorderBrush="{StaticResource InsetBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="24">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel>
-                                    <TextBlock FontSize="15"
-                                               FontWeight="Medium"
-                                               Foreground="{StaticResource PrimaryAccentBrush}"
-                                               Text="{Binding SelectionSummaryText}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,8,0,0"
-                                               FontSize="13"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="固定顺序按从上到下、从左到右；滚轮缩到刚好铺满启用区域时会自动吸附。"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <Button x:Name="ClearCropSelectionButton"
-                                        Grid.Column="1"
-                                        Width="180"
-                                        Style="{StaticResource DangerActionButtonStyle}"
-                                        Click="ClearCropSelectionButton_Click"
-                                        IsEnabled="{Binding CanClearSelection}">
-                                    <TextBlock VerticalAlignment="Center"
-                                               HorizontalAlignment="Center"
-                                               Text="清空所有区域" />
-                                </Button>
-                            </Grid>
-                        </Border>
-
-                        <Border Grid.Row="3"
                                 Margin="0,20,0,0"
                                 Padding="18"
                                 Background="{StaticResource InsetSurfaceBrush}"
