@@ -1310,7 +1310,7 @@ public partial class MainWindow : Window
     {
         _viewModel.PanelMode = panelMode;
         _viewModel.StatusHintText = panelMode == MainPanelMode.Crop
-            ? "提示：拖拽图片可以调整位置，滚轮可以缩放，缩到刚好铺满启用区域时会自动吸附。"
+            ? string.Empty
             : "提示：删除会同步移除开始菜单磁贴和本地记录；失败记录也可以直接清理。";
     }
 
@@ -1403,9 +1403,10 @@ public partial class MainWindow : Window
 
             if (result.IsUpdateAvailable && result.Release is not null)
             {
-                SetStatus(result.SummaryText, Brushes.DarkSlateBlue);
+                // 具体版本信息统一放到左侧底部展示，避免右侧重复占用说明区域。
+                SetStatus(string.Empty, Brushes.DarkSlateBlue);
                 // 先征求用户确认，再决定是否下载更新包，避免启动后自动占用带宽和磁盘。
-                _viewModel.UpdateStatusText = $"发现新版本 {result.Release.Version.ToString(3)}，等待用户确认是否下载。";
+                _viewModel.UpdateStatusText = $"{result.SummaryText} 等待用户确认是否下载。";
                 if (showUpdatePrompt)
                 {
                     await PromptDownloadUpdateAsync(result.Release, result.CurrentVersionText).ConfigureAwait(true);

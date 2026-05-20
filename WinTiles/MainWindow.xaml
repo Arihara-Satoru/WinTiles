@@ -151,13 +151,7 @@
                     Style="{StaticResource ShellCardStyle}"
                     Padding="28">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0"
-                          Visibility="{Binding IsCropMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid Visibility="{Binding IsCropMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
@@ -518,22 +512,16 @@
                                            FontWeight="Medium"
                                            Foreground="{StaticResource PrimaryTextBrush}"
                                            Text="点击动作" />
-                                <TextBlock Margin="0,8,0,0"
-                                           FontSize="13"
-                                           Foreground="{StaticResource SecondaryTextBrush}"
-                                           Text="固定后的这一批图片磁贴会共用同一个点击动作；不设置时，点击磁贴会回到 WinTiles 历史记录。"
-                                           TextWrapping="Wrap" />
-
-                                <StackPanel Margin="0,16,0,0"
+                                <StackPanel Margin="0,12,0,0"
                                             Orientation="Horizontal">
                                     <RadioButton GroupName="TileClickActionGroup"
-                                                 Margin="0,0,20,0"
+                                                 Margin="0,0,16,0"
                                                  VerticalAlignment="Center"
                                                  IsChecked="{Binding IsNoClickActionSelected, Mode=OneWay}"
                                                  Checked="NoClickActionRadioButton_Checked"
                                                  Content="不设置" />
                                     <RadioButton GroupName="TileClickActionGroup"
-                                                 Margin="0,0,20,0"
+                                                 Margin="0,0,16,0"
                                                  VerticalAlignment="Center"
                                                  IsChecked="{Binding IsOpenUrlActionSelected, Mode=OneWay}"
                                                  Checked="OpenUrlActionRadioButton_Checked"
@@ -545,7 +533,7 @@
                                                  Content="打开应用" />
                                 </StackPanel>
 
-                                <StackPanel Margin="0,16,0,0">
+                                <StackPanel Margin="0,12,0,0">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -559,19 +547,19 @@
                                     <TextBlock FontSize="13"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="网页地址" />
-                                    <TextBox Margin="0,8,0,0"
-                                             Padding="14,10"
+                                    <TextBox Margin="0,6,0,0"
+                                             Padding="12,8"
                                              FontSize="14"
                                              Text="{Binding ClickActionUrl, UpdateSourceTrigger=PropertyChanged}"
                                              TextChanged="ClickActionInputChanged" />
-                                    <TextBlock Margin="0,8,0,0"
+                                    <TextBlock Margin="0,6,0,0"
                                                FontSize="12"
                                                Foreground="{StaticResource SecondaryTextBrush}"
                                                Text="仅支持 http:// 或 https:// 链接。"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
 
-                                <StackPanel Margin="0,16,0,0">
+                                <StackPanel Margin="0,12,0,0">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -583,78 +571,120 @@
                                         </Style>
                                     </StackPanel.Style>
 
-                                    <TextBlock FontSize="13"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="应用路径" />
-                                    <Grid Margin="0,8,0,0">
+                                    <StackPanel.Resources>
+                                        <!-- 为“打开应用”表单单独收紧按钮和输入框尺寸，避免沿用左侧大按钮样式后显得过于笨重。 -->
+                                        <Style x:Key="CompactActionButtonStyle"
+                                               TargetType="Button"
+                                               BasedOn="{StaticResource SecondaryActionButtonStyle}">
+                                            <Setter Property="Margin" Value="0" />
+                                            <Setter Property="Padding" Value="12,8" />
+                                            <Setter Property="MinHeight" Value="42" />
+                                            <Setter Property="FontSize" Value="14" />
+                                        </Style>
+
+                                        <Style x:Key="CompactActionButtonTextStyle"
+                                               TargetType="TextBlock"
+                                               BasedOn="{StaticResource ActionButtonTextStyle}">
+                                            <Setter Property="FontSize" Value="14" />
+                                        </Style>
+
+                                        <Style x:Key="CompactActionTextBoxStyle" TargetType="TextBox">
+                                            <Setter Property="Padding" Value="10,7" />
+                                            <Setter Property="FontSize" Value="14" />
+                                            <Setter Property="MinHeight" Value="40" />
+                                        </Style>
+                                    </StackPanel.Resources>
+
+                                    <!-- 这里进一步改成三列同一行表单，把应用路径、启动参数和工作目录并排展示，继续压缩纵向空间。 -->
+                                    <Grid Margin="0,0,0,0">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.35*" />
                                             <ColumnDefinition Width="12" />
-                                            <ColumnDefinition Width="132" />
+                                            <ColumnDefinition Width="0.95*" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="1.15*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBox Padding="14,10"
-                                                 FontSize="14"
-                                                 Text="{Binding ClickActionApplicationPath, UpdateSourceTrigger=PropertyChanged}"
-                                                 TextChanged="ClickActionInputChanged" />
-                                        <Button Grid.Column="2"
-                                                Style="{StaticResource SecondaryActionButtonStyle}"
-                                                Click="BrowseApplicationPathButton_Click">
-                                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
-                                                       Text="浏览..." />
-                                        </Button>
+
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                                       Text="应用路径" />
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="96" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Style="{StaticResource CompactActionTextBoxStyle}"
+                                                         Text="{Binding ClickActionApplicationPath, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextChanged="ClickActionInputChanged" />
+                                                <Button Grid.Column="2"
+                                                        Style="{StaticResource CompactActionButtonStyle}"
+                                                        Click="BrowseApplicationPathButton_Click">
+                                                    <TextBlock Style="{StaticResource CompactActionButtonTextStyle}"
+                                                               Text="浏览" />
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                                       Text="启动参数" />
+                                            <TextBox Margin="0,6,0,0"
+                                                     Style="{StaticResource CompactActionTextBoxStyle}"
+                                                     Text="{Binding ClickActionArguments, UpdateSourceTrigger=PropertyChanged}"
+                                                     TextChanged="ClickActionInputChanged" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{StaticResource SecondaryTextBrush}"
+                                                       Text="工作目录" />
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="108" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Style="{StaticResource CompactActionTextBoxStyle}"
+                                                         Text="{Binding ClickActionWorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                                         TextChanged="ClickActionInputChanged" />
+                                                <Button Grid.Column="2"
+                                                        Style="{StaticResource CompactActionButtonStyle}"
+                                                        Click="UseApplicationDirectoryButton_Click">
+                                                    <TextBlock Style="{StaticResource CompactActionButtonTextStyle}"
+                                                               Text="应用目录" />
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
                                     </Grid>
 
-                                    <TextBlock Margin="0,14,0,0"
-                                               FontSize="13"
+                                    <TextBlock Margin="0,8,0,0"
+                                               FontSize="12"
                                                Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="启动参数" />
-                                    <TextBox Margin="0,8,0,0"
-                                             Padding="14,10"
-                                             FontSize="14"
-                                             Text="{Binding ClickActionArguments, UpdateSourceTrigger=PropertyChanged}"
-                                             TextChanged="ClickActionInputChanged" />
-
-                                    <TextBlock Margin="0,14,0,0"
-                                               FontSize="13"
-                                               Foreground="{StaticResource SecondaryTextBrush}"
-                                               Text="工作目录" />
-                                    <Grid Margin="0,8,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="12" />
-                                            <ColumnDefinition Width="176" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Padding="14,10"
-                                                 FontSize="14"
-                                                 Text="{Binding ClickActionWorkingDirectory, UpdateSourceTrigger=PropertyChanged}"
-                                                 TextChanged="ClickActionInputChanged" />
-                                        <Button Grid.Column="2"
-                                                Style="{StaticResource SecondaryActionButtonStyle}"
-                                                Click="UseApplicationDirectoryButton_Click">
-                                            <TextBlock Style="{StaticResource ActionButtonTextStyle}"
-                                                       Text="使用应用目录" />
-                                        </Button>
-                                    </Grid>
+                                               Text="工作目录留空时默认使用应用所在目录；需要特殊启动环境时，再手动指定。"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
-                                <Border Margin="0,16,0,0"
-                                        Padding="14,12"
+                                <Border Margin="0,12,0,0"
+                                        Padding="10,8"
                                         Background="{StaticResource PrimaryAccentSoftBrush}"
                                         BorderBrush="#D6E4FB"
                                         BorderThickness="1"
-                                        CornerRadius="18">
+                                        CornerRadius="16">
                                     <StackPanel>
-                                        <TextBlock FontSize="13"
+                                        <TextBlock FontSize="12"
                                                    Foreground="{StaticResource SecondaryTextBrush}"
                                                    Text="动作摘要预览" />
-                                        <TextBlock Margin="0,8,0,0"
+                                        <TextBlock Margin="0,6,0,0"
                                                    FontSize="14"
                                                    FontWeight="Medium"
                                                    Foreground="{StaticResource PrimaryTextBrush}"
                                                    Text="{Binding ClickActionSummaryText}"
                                                    TextWrapping="Wrap" />
-                                        <TextBlock Margin="0,8,0,0"
-                                                   FontSize="13"
+                                        <TextBlock Margin="0,6,0,0"
+                                                   FontSize="12"
                                                    Foreground="{Binding ClickActionValidationBrush}"
                                                    Text="{Binding ClickActionValidationText}"
                                                    TextWrapping="Wrap" />
@@ -664,8 +694,7 @@
                         </Border>
                     </Grid>
 
-                    <Grid Grid.Row="0"
-                          Visibility="{Binding IsHistoryMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid Visibility="{Binding IsHistoryMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
@@ -1003,26 +1032,6 @@
                         </Border>
                     </Grid>
 
-                    <Border Grid.Row="1"
-                            Margin="0,20,0,0"
-                            Padding="18"
-                            Background="{StaticResource InsetSurfaceBrush}"
-                            BorderBrush="{StaticResource InsetBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="24">
-                        <StackPanel>
-                            <TextBlock FontSize="15"
-                                       FontWeight="Medium"
-                                       Foreground="{Binding StatusBrush}"
-                                       Text="{Binding StatusText}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock Margin="0,8,0,0"
-                                       FontSize="13"
-                                       Foreground="{StaticResource SecondaryTextBrush}"
-                                       Text="{Binding StatusHintText}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
                 </Grid>
             </Border>
         </Grid>
