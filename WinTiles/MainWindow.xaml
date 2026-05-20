@@ -267,6 +267,11 @@
                                                                        FontWeight="Normal"
                                                                        Foreground="#79A9FF"
                                                                        Text="+" />
+                                                            <Rectangle x:Name="UnavailableMask"
+                                                                       Fill="#EAF1F8F0"
+                                                                       Stroke="#D6E2F0"
+                                                                       StrokeThickness="1"
+                                                                       Visibility="Collapsed" />
                                                         </Grid>
                                                         <DataTemplate.Triggers>
                                                             <DataTrigger Binding="{Binding IsSelected}"
@@ -278,6 +283,18 @@
                                                                         Property="Visibility"
                                                                         Value="Collapsed" />
                                                                 <Setter TargetName="ActiveCell"
+                                                                        Property="Visibility"
+                                                                        Value="Visible" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsAvailable}"
+                                                                         Value="False">
+                                                                <Setter TargetName="InactiveCell"
+                                                                        Property="Opacity"
+                                                                        Value="0.35" />
+                                                                <Setter TargetName="PlusText"
+                                                                        Property="Visibility"
+                                                                        Value="Collapsed" />
+                                                                <Setter TargetName="UnavailableMask"
                                                                         Property="Visibility"
                                                                         Value="Visible" />
                                                             </DataTrigger>
@@ -426,11 +443,45 @@
                                                        Foreground="{StaticResource PrimaryAccentBrush}"
                                                        Text="{Binding SelectionSummaryText}"
                                                        TextWrapping="Wrap" />
-                                            <TextBlock Margin="0,18,0,0"
-                                                       FontSize="38"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource PrimaryAccentBrush}"
-                                                       Text="{Binding ActiveCropCellCount, StringFormat={}{0} / 25}" />
+                                            <Grid Margin="0,18,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="54" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="54" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBox x:Name="ActiveCropCellCountTextBox"
+                                                         Grid.Column="0"
+                                                         Width="54"
+                                                         Padding="0"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         FontSize="38"
+                                                         FontWeight="SemiBold"
+                                                         Foreground="{StaticResource PrimaryAccentBrush}"
+                                                         HorizontalContentAlignment="Left"
+                                                         Text="{Binding ActiveCropCellCount}"
+                                                         LostFocus="CropCountTextBox_LostFocus" />
+                                                <TextBlock Grid.Column="1"
+                                                           VerticalAlignment="Center"
+                                                           Margin="8,0"
+                                                           FontSize="38"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource PrimaryAccentBrush}"
+                                                           Text="/" />
+                                                <TextBox x:Name="CropCellTotalCountTextBox"
+                                                         Grid.Column="2"
+                                                         Width="54"
+                                                         Padding="0"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         FontSize="38"
+                                                         FontWeight="SemiBold"
+                                                         Foreground="{StaticResource PrimaryAccentBrush}"
+                                                         HorizontalContentAlignment="Left"
+                                                         Text="{Binding CropCellTotalCount}"
+                                                         LostFocus="CropCountTextBox_LostFocus" />
+                                            </Grid>
                                             <TextBlock Margin="0,4,0,0"
                                                        FontSize="13"
                                                        Foreground="{StaticResource SecondaryTextBrush}"

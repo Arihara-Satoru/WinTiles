@@ -31,6 +31,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _canCheckForUpdates = true;
     private bool _isCheckingForUpdates;
     private int _activeCropCellCount;
+    private int _cropCellTotalCount = 25;
     private string _selectionSummaryText = "尚未启用裁切区域";
     private string _zoomText = "缩放 100%";
     private string _updateStatusText = "版本检查未开始。";
@@ -217,9 +218,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 裁切网格总数量，当前固定为 5 x 5。
+    /// 当前允许使用的裁切区域总数量。
     /// </summary>
-    public int CropCellTotalCount => 25;
+    public int CropCellTotalCount
+    {
+        get => _cropCellTotalCount;
+        set => SetField(ref _cropCellTotalCount, value);
+    }
 
     public string ZoomText
     {

@@ -3,6 +3,7 @@ namespace WinTiles;
 public sealed class CropCellViewModel : ViewModelBase
 {
     private bool _isSelected;
+    private bool _isAvailable = true;
     private double _left;
     private double _top;
     private double _size;
@@ -27,6 +28,15 @@ public sealed class CropCellViewModel : ViewModelBase
                 OnPropertyChanged(nameof(ShowPlus));
             }
         }
+    }
+
+    /// <summary>
+    /// 指示当前裁切格子是否处于可用状态。
+    /// </summary>
+    public bool IsAvailable
+    {
+        get => _isAvailable;
+        set => SetField(ref _isAvailable, value);
     }
 
     public double Left

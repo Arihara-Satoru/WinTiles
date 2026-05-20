@@ -1134,7 +1134,7 @@ public partial class MainWindow : Window
             point.Y >= cropCell.Top &&
             point.Y <= cropCell.Top + cropCell.Size);
 
-        if (cell is null)
+        if (cell is null || !cell.IsAvailable)
         {
             return;
         }
@@ -1294,7 +1294,7 @@ public partial class MainWindow : Window
     private void UpdateSelectionSummary()
     {
         var activeCells = _viewModel.CropCells
-            .Where(cell => cell.IsSelected)
+            .Where(cell => cell.IsAvailable && cell.IsSelected)
             .OrderBy(cell => cell.Row)
             .ThenBy(cell => cell.Column)
             .ToArray();
@@ -1303,7 +1303,7 @@ public partial class MainWindow : Window
         _viewModel.ActiveCropCellCount = activeCells.Length;
         _viewModel.SelectionSummaryText = activeCells.Length == 0
             ? "尚未启用裁切区域"
-            : $"已启用 {activeCells.Length} / 25 个区域";
+            : $"已启用 {activeCells.Length} / {_viewModel.CropCellTotalCount} 个区域";
     }
 
     private void ApplyPanelMode(MainPanelMode panelMode)
@@ -1839,9 +1839,60 @@ public partial class MainWindow : Window
     private IReadOnlyCollection<(int Row, int Column)> GetActiveCells()
     {
         return _viewModel.CropCells
-            .Where(cell => cell.IsSelected)
+            .Where(cell => cell.IsAvailable && cell.IsSelected)
             .Select(cell => (cell.Row, cell.Column))
             .ToArray();
+    }
+
+    /// <summary>
+    /// 在右侧输入框失焦后，同步已启用数量和总数量到真实裁切网格。
+    /// </summary>
+    private void CropCountTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        var requestedTotalCount = ParseCropCountText(CropCellTotalCountTextBox?.Text, _viewModel.CropCellTotalCount);
+        var normalizedTotalCount = Math.Clamp(requestedTotalCount, 0, _viewModel.CropCells.Count);
+        var requestedActiveCount = ParseCropCountText(ActiveCropCellCountTextBox?.Text, _viewModel.ActiveCropCellCount);
+        var normalizedActiveCount = Math.Clamp(requestedActiveCount, 0, normalizedTotalCount);
+
+        ApplyEditableCropCounts(normalizedActiveCount, normalizedTotalCount);
+    }
+
+    /// <summary>
+    /// 解析输入框中的数量文本，解析失败时回退到给定默认值。
+    /// </summary>
+    private static int ParseCropCountText(string? text, int fallbackValue)
+    {
+        return int.TryParse(text, out var parsedValue)
+            ? parsedValue
+            : fallbackValue;
+    }
+
+    /// <summary>
+    /// 按固定顺序重建可用区域和启用区域，确保输入值与真实裁切状态一致。
+    /// </summary>
+    private void ApplyEditableCropCounts(int activeCount, int totalCount)
+    {
+        var orderedCells = _viewModel.CropCells
+            .OrderBy(cell => cell.Row)
+            .ThenBy(cell => cell.Column)
+            .ToArray();
+
+        for (var index = 0; index < orderedCells.Length; index++)
+        {
+            var isAvailable = index < totalCount;
+            orderedCells[index].IsAvailable = isAvailable;
+            orderedCells[index].IsSelected = isAvailable && index < activeCount;
+        }
+
+        _viewModel.CropCellTotalCount = totalCount;
+        UpdateSelectionSummary();
+
+        if (_viewModel.HasCropImage)
+        {
+            EnsureCropTransformWithinBounds(recenterWhenNeeded: true);
+        }
+
+        RefreshActionButtonsState();
     }
 
     private DrawingSizeF GetCropBoardSize()
