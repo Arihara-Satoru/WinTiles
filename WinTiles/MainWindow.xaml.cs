@@ -19,10 +19,14 @@ public partial class MainWindow : Window
     private const float CropCellGap = 6f;
     private const float ZoomStep = 1.10f;
     private const double DragThreshold = 4d;
+    private const double CropAxisBandSize = 40d;
+    private const double CropAxisButtonSize = 28d;
+    private const double CropAxisButtonOverflow = CropAxisButtonSize / 2d;
 
     private readonly WinTilesApplicationContext _applicationContext;
     private readonly MainWindowViewModel _viewModel;
     private readonly CropLayoutCalculator _cropLayoutCalculator;
+    private readonly RectangularCropSelectionController _rectangularCropSelectionController;
 
     private SilentUpdatePreparationResult? _preparedUpdate;
     private string? _selectedImagePath;
@@ -35,6 +39,7 @@ public partial class MainWindow : Window
     {
         _applicationContext = applicationContext;
         _cropLayoutCalculator = applicationContext.CropLayoutCalculator;
+        _rectangularCropSelectionController = new RectangularCropSelectionController();
         _viewModel = new MainWindowViewModel();
 
         InitializeComponent();
@@ -213,17 +218,36 @@ public partial class MainWindow : Window
         ApplyPanelMode(MainPanelMode.Crop);
     }
 
-    private void ClearCropSelectionButton_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// 根据用户点击的左侧行控制按钮，更新当前矩形裁切区域的行数。
+    /// </summary>
+    private void CropRowControlButton_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var cell in _viewModel.CropCells)
+        if (sender is not Button { Tag: CropAxisControlViewModel rowControl } || !rowControl.IsEnabled)
         {
-            cell.IsSelected = false;
+            return;
         }
 
-        UpdateSelectionSummary();
-        ResetCropTransform();
-        SetStatus("已清空所有裁切区域。", Brushes.DarkSlateBlue);
-        RefreshActionButtonsState();
+        var nextRowCount = _rectangularCropSelectionController.ResolveAxisCountFromClick(
+            _viewModel.ActiveCropRowCount,
+            rowControl.Index);
+        ApplyRectangularSelection(nextRowCount, _viewModel.ActiveCropColumnCount, recenterWhenNeeded: true);
+    }
+
+    /// <summary>
+    /// 根据用户点击的顶部列控制按钮，更新当前矩形裁切区域的列数。
+    /// </summary>
+    private void CropColumnControlButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: CropAxisControlViewModel columnControl } || !columnControl.IsEnabled)
+        {
+            return;
+        }
+
+        var nextColumnCount = _rectangularCropSelectionController.ResolveAxisCountFromClick(
+            _viewModel.ActiveCropColumnCount,
+            columnControl.Index);
+        ApplyRectangularSelection(_viewModel.ActiveCropRowCount, nextColumnCount, recenterWhenNeeded: true);
     }
 
     private async void ClearAllPinnedTilesButton_Click(object sender, RoutedEventArgs e)
@@ -371,13 +395,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var releasePoint = e.GetPosition(CropBoardBorder);
         CropBoardBorder.ReleaseMouseCapture();
-
-        if (!_isDraggingCropImage)
-        {
-            ToggleCellAtPoint(releasePoint);
-        }
 
         _dragStartPoint = null;
         _isDraggingCropImage = false;
@@ -411,7 +429,7 @@ public partial class MainWindow : Window
         var activeCells = GetActiveCells();
         if (activeCells.Count == 0)
         {
-            MessageBox.Show(this, "请先点击右侧网格，至少启用一个裁切区域。", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "当前没有可用的裁切区域，请先调整左侧和顶部按钮。", "WinTiles", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -1087,18 +1105,39 @@ public partial class MainWindow : Window
         return (true, CombineWarnings(messages.ToArray()));
     }
 
+    /// <summary>
+    /// 初始化 5x5 裁切格子以及顶部、左侧的行列控制按钮，并套用默认 2x2 选区。
+    /// </summary>
     private void InitializeCropCells()
     {
         _viewModel.CropCells.Clear();
+        _viewModel.CropRowControls.Clear();
+        _viewModel.CropColumnControls.Clear();
+
         for (var row = 0; row < CropLayoutCalculator.GridDimension; row++)
         {
+            _viewModel.CropRowControls.Add(new CropAxisControlViewModel(row));
+
             for (var column = 0; column < CropLayoutCalculator.GridDimension; column++)
             {
+                if (row == 0)
+                {
+                    _viewModel.CropColumnControls.Add(new CropAxisControlViewModel(column));
+                }
+
                 _viewModel.CropCells.Add(new CropCellViewModel(row, column));
             }
         }
+
+        ApplyRectangularSelection(
+            RectangularCropSelectionController.DefaultAxisCount,
+            RectangularCropSelectionController.DefaultAxisCount,
+            recenterWhenNeeded: false);
     }
 
+    /// <summary>
+    /// 当预览区尺寸变化时，同步刷新裁切板、格子和行列按钮的位置。
+    /// </summary>
     private void UpdateCropBoardLayout()
     {
         if (CropBoardHost is null)
@@ -1106,47 +1145,174 @@ public partial class MainWindow : Window
             return;
         }
 
-        var boardSize = Math.Min(CropBoardHost.ActualWidth, CropBoardHost.ActualHeight);
-        if (boardSize <= 0)
+        var availableWidth = CropBoardHost.ActualWidth - CropAxisBandSize - CropAxisButtonOverflow;
+        var availableHeight = CropBoardHost.ActualHeight - CropAxisBandSize - CropAxisButtonOverflow;
+        if (availableWidth <= 0 || availableHeight <= 0)
         {
             return;
         }
 
-        _viewModel.CropBoardSize = boardSize;
+        var boardSizeF = _cropLayoutCalculator.CalculateBoardSize(
+            new DrawingSizeF((float)availableWidth, (float)availableHeight),
+            CropCellGap,
+            _viewModel.ActiveCropRowCount,
+            _viewModel.ActiveCropColumnCount);
+        _viewModel.CropBoardWidth = boardSizeF.Width;
+        _viewModel.CropBoardHeight = boardSizeF.Height;
+        _viewModel.CropColumnControlWidth = boardSizeF.Width + CropAxisButtonOverflow;
+        _viewModel.CropRowControlHeight = boardSizeF.Height + CropAxisButtonOverflow;
 
-        var boardSizeF = GetCropBoardSize();
-        var cellSize = _cropLayoutCalculator.CalculateCellSize(boardSizeF, CropCellGap);
+        var cellSize = _cropLayoutCalculator.CalculateCellSize(
+            boardSizeF,
+            CropCellGap,
+            _viewModel.ActiveCropRowCount,
+            _viewModel.ActiveCropColumnCount);
         foreach (var cell in _viewModel.CropCells)
         {
-            var cellBounds = _cropLayoutCalculator.GetCellBounds(boardSizeF, CropCellGap, cell.Row, cell.Column);
+            cell.IsVisible =
+                cell.Row < _viewModel.ActiveCropRowCount &&
+                cell.Column < _viewModel.ActiveCropColumnCount;
+
+            if (!cell.IsVisible)
+            {
+                continue;
+            }
+
+            var cellBounds = _cropLayoutCalculator.GetCellBounds(
+                boardSizeF,
+                CropCellGap,
+                cell.Row,
+                cell.Column,
+                _viewModel.ActiveCropRowCount,
+                _viewModel.ActiveCropColumnCount);
             cell.Left = cellBounds.Left;
             cell.Top = cellBounds.Top;
             cell.Size = cellSize;
         }
 
+        UpdateCropAxisControlLayout();
         EnsureCropTransformWithinBounds(recenterWhenNeeded: false);
     }
 
-    private void ToggleCellAtPoint(Point point)
+    /// <summary>
+    /// 根据当前行列数，把裁切板中的高亮格子同步为左上角连续矩形。
+    /// </summary>
+    private void SyncCropCellSelectionVisuals()
     {
-        var cell = _viewModel.CropCells.FirstOrDefault(cropCell =>
-            point.X >= cropCell.Left &&
-            point.X <= cropCell.Left + cropCell.Size &&
-            point.Y >= cropCell.Top &&
-            point.Y <= cropCell.Top + cropCell.Size);
-
-        if (cell is null || !cell.IsAvailable)
+        foreach (var cell in _viewModel.CropCells)
         {
-            return;
+            cell.IsVisible =
+                cell.Row < _viewModel.ActiveCropRowCount &&
+                cell.Column < _viewModel.ActiveCropColumnCount;
+            cell.IsSelected =
+                cell.Row < _viewModel.ActiveCropRowCount &&
+                cell.Column < _viewModel.ActiveCropColumnCount;
+        }
+    }
+
+    /// <summary>
+    /// 根据当前矩形行列数刷新顶部和左侧按钮的加减状态与可点击状态。
+    /// </summary>
+    private void UpdateCropAxisControlStates()
+    {
+        foreach (var rowControl in _viewModel.CropRowControls)
+        {
+            rowControl.IsActive = rowControl.Index < _viewModel.ActiveCropRowCount;
+            rowControl.IsVisible =
+                rowControl.Index < _viewModel.ActiveCropRowCount ||
+                (rowControl.Index == _viewModel.ActiveCropRowCount &&
+                 _viewModel.ActiveCropRowCount < RectangularCropSelectionController.MaximumAxisCount);
+            rowControl.IsEnabled = rowControl.IsVisible && _rectangularCropSelectionController.IsAxisButtonEnabled(
+                _viewModel.ActiveCropRowCount,
+                rowControl.Index);
         }
 
-        var hadNoSelection = GetActiveCells().Count == 0;
-        cell.IsSelected = !cell.IsSelected;
+        foreach (var columnControl in _viewModel.CropColumnControls)
+        {
+            columnControl.IsActive = columnControl.Index < _viewModel.ActiveCropColumnCount;
+            columnControl.IsVisible =
+                columnControl.Index < _viewModel.ActiveCropColumnCount ||
+                (columnControl.Index == _viewModel.ActiveCropColumnCount &&
+                 _viewModel.ActiveCropColumnCount < RectangularCropSelectionController.MaximumAxisCount);
+            columnControl.IsEnabled = columnControl.IsVisible && _rectangularCropSelectionController.IsAxisButtonEnabled(
+                _viewModel.ActiveCropColumnCount,
+                columnControl.Index);
+        }
+    }
+
+    /// <summary>
+    /// 在裁切板尺寸变化后，重新计算顶部列按钮和左侧行按钮的位置。
+    /// </summary>
+    private void UpdateCropAxisControlLayout()
+    {
+        var boardSize = GetCropBoardSize();
+        var axisControlInset = (_cropLayoutCalculator.CalculateCellSize(
+            boardSize,
+            CropCellGap,
+            _viewModel.ActiveCropRowCount,
+            _viewModel.ActiveCropColumnCount) - CropAxisButtonSize) / 2d;
+
+        foreach (var rowControl in _viewModel.CropRowControls)
+        {
+            rowControl.Left = 0d;
+
+            if (rowControl.Index < _viewModel.ActiveCropRowCount)
+            {
+                var cellBounds = _cropLayoutCalculator.GetCellBounds(
+                    boardSize,
+                    CropCellGap,
+                    rowControl.Index,
+                    0,
+                    _viewModel.ActiveCropRowCount,
+                    _viewModel.ActiveCropColumnCount);
+                rowControl.Top = cellBounds.Top + axisControlInset;
+                continue;
+            }
+
+            rowControl.Top = boardSize.Height - CropAxisButtonOverflow;
+        }
+
+        foreach (var columnControl in _viewModel.CropColumnControls)
+        {
+            columnControl.Top = 0d;
+
+            if (columnControl.Index < _viewModel.ActiveCropColumnCount)
+            {
+                var cellBounds = _cropLayoutCalculator.GetCellBounds(
+                    boardSize,
+                    CropCellGap,
+                    0,
+                    columnControl.Index,
+                    _viewModel.ActiveCropRowCount,
+                    _viewModel.ActiveCropColumnCount);
+                columnControl.Left = cellBounds.Left + axisControlInset;
+                continue;
+            }
+
+            columnControl.Left = boardSize.Width - CropAxisButtonOverflow;
+        }
+    }
+
+    /// <summary>
+    /// 统一应用新的矩形行列数，并联动刷新高亮、按钮状态和裁切约束。
+    /// </summary>
+    /// <param name="rowCount">目标行数。</param>
+    /// <param name="columnCount">目标列数。</param>
+    /// <param name="recenterWhenNeeded">是否在变化后重新以当前活跃矩形为中心摆放图片。</param>
+    private void ApplyRectangularSelection(int rowCount, int columnCount, bool recenterWhenNeeded)
+    {
+        _viewModel.ActiveCropRowCount = _rectangularCropSelectionController.NormalizeAxisCount(rowCount);
+        _viewModel.ActiveCropColumnCount = _rectangularCropSelectionController.NormalizeAxisCount(columnCount);
+
+        SyncCropCellSelectionVisuals();
+        UpdateCropAxisControlStates();
         UpdateSelectionSummary();
+        // 行列数变化后要立刻重算裁切板尺寸，确保 1x1、2x2、5x5 都能按当前格子数铺满预览区。
+        UpdateCropBoardLayout();
 
         if (_viewModel.HasCropImage)
         {
-            EnsureCropTransformWithinBounds(recenterWhenNeeded: hadNoSelection || GetActiveCells().Count == 1);
+            EnsureCropTransformWithinBounds(recenterWhenNeeded);
         }
 
         RefreshActionButtonsState();
@@ -1159,7 +1325,7 @@ public partial class MainWindow : Window
             var bitmap = CreateBitmapImage(imagePath);
             _viewModel.CropImage = bitmap;
             _viewModel.HasCropImage = true;
-        _selectedImagePixelSize = new DrawingSizeF(bitmap.PixelWidth, bitmap.PixelHeight);
+            _selectedImagePixelSize = new DrawingSizeF(bitmap.PixelWidth, bitmap.PixelHeight);
 
             if (CropImageElement is not null)
             {
@@ -1168,7 +1334,7 @@ public partial class MainWindow : Window
             }
 
             _viewModel.CropTitle = Path.GetFileName(imagePath);
-            _viewModel.CropSubtitle = "已选择图片。点击格子启用区域，然后用滚轮缩放、拖拽位置。";
+            _viewModel.CropSubtitle = "已选择图片。使用顶部列按钮和左侧行按钮调整区域，然后在预览区内滚轮缩放、拖拽位置。";
             SetStatus($"已选择图片：{Path.GetFileName(imagePath)}", Brushes.DarkSlateBlue);
             ResetCropTransform();
         }
@@ -1196,7 +1362,7 @@ public partial class MainWindow : Window
         _viewModel.CropImage = null;
         _viewModel.HasCropImage = false;
         _viewModel.CropTitle = "尚未选择图片";
-        _viewModel.CropSubtitle = "本批固定完成。已保留启用区域，请重新选择图片继续固定。";
+        _viewModel.CropSubtitle = "本批固定完成。已保留当前矩形区域，请重新选择图片继续固定。";
 
         if (CropImageElement is not null)
         {
@@ -1294,17 +1460,8 @@ public partial class MainWindow : Window
 
     private void UpdateSelectionSummary()
     {
-        var activeCells = _viewModel.CropCells
-            .Where(cell => cell.IsAvailable && cell.IsSelected)
-            .OrderBy(cell => cell.Row)
-            .ThenBy(cell => cell.Column)
-            .ToArray();
-
-        // 统一维护选中数量，供右侧设置卡片直接绑定显示。
-        _viewModel.ActiveCropCellCount = activeCells.Length;
-        _viewModel.SelectionSummaryText = activeCells.Length == 0
-            ? "尚未启用裁切区域"
-            : $"已启用 {activeCells.Length} / {_viewModel.CropCellTotalCount} 个区域";
+        var activeCellCount = _viewModel.ActiveCropRowCount * _viewModel.ActiveCropColumnCount;
+        _viewModel.SelectionSummaryText = $"当前 {_viewModel.ActiveCropRowCount} 行 x {_viewModel.ActiveCropColumnCount} 列，共 {activeCellCount} 块";
     }
 
     private void ApplyPanelMode(MainPanelMode panelMode)
@@ -1367,7 +1524,6 @@ public partial class MainWindow : Window
             environmentReady &&
             clickActionValidation.IsValid;
         _viewModel.CanOpenHistory = !_viewModel.IsBusy;
-        _viewModel.CanClearSelection = !_viewModel.IsBusy && activeCellsCount > 0;
         _viewModel.CanClearAllPinnedTiles = !_viewModel.IsBusy && environmentReady && _viewModel.HasHistoryItems;
         _viewModel.CanOpenRecordFolder = !_viewModel.IsBusy;
         _viewModel.CanCheckForUpdates = !_viewModel.IsBusy && !_viewModel.IsCheckingForUpdates;
@@ -1915,68 +2071,19 @@ public partial class MainWindow : Window
             : string.Join(Environment.NewLine, filteredMessages);
     }
 
+    /// <summary>
+    /// 根据当前行列数返回左上角连续矩形中的所有活跃格子。
+    /// </summary>
     private IReadOnlyCollection<(int Row, int Column)> GetActiveCells()
     {
-        return _viewModel.CropCells
-            .Where(cell => cell.IsAvailable && cell.IsSelected)
-            .Select(cell => (cell.Row, cell.Column))
-            .ToArray();
-    }
-
-    /// <summary>
-    /// 在右侧输入框失焦后，同步已启用数量和总数量到真实裁切网格。
-    /// </summary>
-    private void CropCountTextBox_LostFocus(object sender, RoutedEventArgs e)
-    {
-        var requestedTotalCount = ParseCropCountText(CropCellTotalCountTextBox?.Text, _viewModel.CropCellTotalCount);
-        var normalizedTotalCount = Math.Clamp(requestedTotalCount, 0, _viewModel.CropCells.Count);
-        var requestedActiveCount = ParseCropCountText(ActiveCropCellCountTextBox?.Text, _viewModel.ActiveCropCellCount);
-        var normalizedActiveCount = Math.Clamp(requestedActiveCount, 0, normalizedTotalCount);
-
-        ApplyEditableCropCounts(normalizedActiveCount, normalizedTotalCount);
-    }
-
-    /// <summary>
-    /// 解析输入框中的数量文本，解析失败时回退到给定默认值。
-    /// </summary>
-    private static int ParseCropCountText(string? text, int fallbackValue)
-    {
-        return int.TryParse(text, out var parsedValue)
-            ? parsedValue
-            : fallbackValue;
-    }
-
-    /// <summary>
-    /// 按固定顺序重建可用区域和启用区域，确保输入值与真实裁切状态一致。
-    /// </summary>
-    private void ApplyEditableCropCounts(int activeCount, int totalCount)
-    {
-        var orderedCells = _viewModel.CropCells
-            .OrderBy(cell => cell.Row)
-            .ThenBy(cell => cell.Column)
-            .ToArray();
-
-        for (var index = 0; index < orderedCells.Length; index++)
-        {
-            var isAvailable = index < totalCount;
-            orderedCells[index].IsAvailable = isAvailable;
-            orderedCells[index].IsSelected = isAvailable && index < activeCount;
-        }
-
-        _viewModel.CropCellTotalCount = totalCount;
-        UpdateSelectionSummary();
-
-        if (_viewModel.HasCropImage)
-        {
-            EnsureCropTransformWithinBounds(recenterWhenNeeded: true);
-        }
-
-        RefreshActionButtonsState();
+        return _rectangularCropSelectionController.BuildActiveCells(
+            _viewModel.ActiveCropRowCount,
+            _viewModel.ActiveCropColumnCount);
     }
 
     private DrawingSizeF GetCropBoardSize()
     {
-        return new DrawingSizeF((float)_viewModel.CropBoardSize, (float)_viewModel.CropBoardSize);
+        return new DrawingSizeF((float)_viewModel.CropBoardWidth, (float)_viewModel.CropBoardHeight);
     }
 
     private string BuildStartMenuShortcutPath(

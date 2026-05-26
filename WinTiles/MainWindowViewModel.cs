@@ -2,17 +2,21 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using WinTiles.Core.Models;
+using WinTiles.Core.Services;
 
 namespace WinTiles;
 
+/// <summary>
+/// 管理主窗口裁切区、历史区和点击动作区的界面状态。
+/// </summary>
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private MainPanelMode _panelMode = MainPanelMode.Crop;
     private string _cropTitle = "尚未选择图片";
-    private string _cropSubtitle = "点击网格启用裁切区域，然后在右侧用滚轮缩放、拖拽图片位置。";
+    private string _cropSubtitle = "使用左侧行按钮和顶部列按钮调整裁切区域，然后在预览区内滚轮缩放、拖拽图片位置。";
     private BitmapImage? _cropImage;
     private bool _hasCropImage;
-    private string _statusText = "请选择一张图片，然后点击右侧网格启用裁切区域。";
+    private string _statusText = "请选择一张图片，然后通过左侧和顶部按钮调整裁切区域。";
     private string _statusHintText = "提示：拖拽图片可以调整位置，滚轮可以缩放，缩到刚好铺满时会自动吸附。";
     private Brush _statusBrush = Brushes.DarkSlateBlue;
     private string _availabilityMessage = "正在检查经典开始菜单状态…";
@@ -25,14 +29,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _hasHistoryItems;
     private bool _canPinImage;
     private bool _canOpenHistory;
-    private bool _canClearSelection;
     private bool _canClearAllPinnedTiles;
     private bool _canOpenRecordFolder = true;
     private bool _canCheckForUpdates = true;
     private bool _isCheckingForUpdates;
-    private int _activeCropCellCount;
-    private int _cropCellTotalCount = 25;
-    private string _selectionSummaryText = "尚未启用裁切区域";
+    private int _activeCropRowCount = RectangularCropSelectionController.DefaultAxisCount;
+    private int _activeCropColumnCount = RectangularCropSelectionController.DefaultAxisCount;
+    private string _selectionSummaryText = "当前 2 行 x 2 列，共 4 块";
     private string _zoomText = "缩放 100%";
     private string _updateStatusText = "版本检查未开始。";
     private TileClickActionType _selectedClickActionType;
@@ -47,9 +50,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     private double _minimumCropScale = 1d;
     private double _cropOffsetX;
     private double _cropOffsetY;
-    private double _cropBoardSize = 640d;
+    private double _cropBoardWidth = 640d;
+    private double _cropBoardHeight = 640d;
+    private double _cropColumnControlWidth = 654d;
+    private double _cropRowControlHeight = 654d;
 
     public ObservableCollection<CropCellViewModel> CropCells { get; } = new();
+
+    public ObservableCollection<CropAxisControlViewModel> CropRowControls { get; } = new();
+
+    public ObservableCollection<CropAxisControlViewModel> CropColumnControls { get; } = new();
 
     public ObservableCollection<TileBatchHistoryItemViewModel> BatchHistoryItems { get; } = new();
 
@@ -172,12 +182,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetField(ref _canOpenHistory, value);
     }
 
-    public bool CanClearSelection
-    {
-        get => _canClearSelection;
-        set => SetField(ref _canClearSelection, value);
-    }
-
     public bool CanClearAllPinnedTiles
     {
         get => _canClearAllPinnedTiles;
@@ -202,28 +206,28 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetField(ref _isCheckingForUpdates, value);
     }
 
+    /// <summary>
+    /// 当前启用的矩形行数。
+    /// </summary>
+    public int ActiveCropRowCount
+    {
+        get => _activeCropRowCount;
+        set => SetField(ref _activeCropRowCount, value);
+    }
+
+    /// <summary>
+    /// 当前启用的矩形列数。
+    /// </summary>
+    public int ActiveCropColumnCount
+    {
+        get => _activeCropColumnCount;
+        set => SetField(ref _activeCropColumnCount, value);
+    }
+
     public string SelectionSummaryText
     {
         get => _selectionSummaryText;
         set => SetField(ref _selectionSummaryText, value);
-    }
-
-    /// <summary>
-    /// 当前已启用的裁切区域数量。
-    /// </summary>
-    public int ActiveCropCellCount
-    {
-        get => _activeCropCellCount;
-        set => SetField(ref _activeCropCellCount, value);
-    }
-
-    /// <summary>
-    /// 当前允许使用的裁切区域总数量。
-    /// </summary>
-    public int CropCellTotalCount
-    {
-        get => _cropCellTotalCount;
-        set => SetField(ref _cropCellTotalCount, value);
     }
 
     public string ZoomText
@@ -324,9 +328,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetField(ref _cropOffsetY, value);
     }
 
-    public double CropBoardSize
+    public double CropBoardWidth
     {
-        get => _cropBoardSize;
-        set => SetField(ref _cropBoardSize, value);
+        get => _cropBoardWidth;
+        set => SetField(ref _cropBoardWidth, value);
+    }
+
+    /// <summary>
+    /// 当前裁切画板的实际高度，会跟随当前行数动态变化。
+    /// </summary>
+    public double CropBoardHeight
+    {
+        get => _cropBoardHeight;
+        set => SetField(ref _cropBoardHeight, value);
+    }
+
+    /// <summary>
+    /// 顶部列按钮容器的宽度，额外预留半个按钮的溢出空间。
+    /// </summary>
+    public double CropColumnControlWidth
+    {
+        get => _cropColumnControlWidth;
+        set => SetField(ref _cropColumnControlWidth, value);
+    }
+
+    /// <summary>
+    /// 左侧行按钮容器的高度，额外预留半个按钮的溢出空间。
+    /// </summary>
+    public double CropRowControlHeight
+    {
+        get => _cropRowControlHeight;
+        set => SetField(ref _cropRowControlHeight, value);
     }
 }
